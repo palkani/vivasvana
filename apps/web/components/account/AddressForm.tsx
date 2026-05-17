@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { IndianMobileInput } from '@/components/storefront/IndianMobileInput';
 import { accountApi } from '@/lib/account-api';
 import { INDIA_STATES } from '@/lib/india-states';
 import { api } from '@/lib/api';
@@ -97,17 +98,7 @@ export function AddressForm({ initial, onSaved, onCancel }: Props) {
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">Mobile *</span>
-            <Input
-              required
-              type="tel"
-              inputMode="numeric"
-              maxLength={10}
-              pattern="[6-9][0-9]{9}"
-              value={form.phone}
-              onChange={(e) => update('phone', e.target.value.replace(/\D/g, ''))}
-              autoComplete="tel-national"
-              placeholder="10-digit mobile"
-            />
+            <IndianMobileInput value={form.phone} onChange={(v) => update('phone', v)} />
           </label>
 
           <label className="flex flex-col gap-1 md:col-span-2">

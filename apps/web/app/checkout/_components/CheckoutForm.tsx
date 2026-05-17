@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { IndianMobileInput } from '@/components/storefront/IndianMobileInput';
 import { INDIA_STATES, stateName } from '@/lib/india-states';
 import { formatINR } from '@/lib/utils';
 import { api } from '@/lib/api';
@@ -205,16 +206,7 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
             </label>
             <label className="space-y-1">
               <span className="text-sm font-medium">Mobile *</span>
-              <Input
-                type="tel"
-                inputMode="numeric"
-                pattern="[6-9][0-9]{9}"
-                maxLength={10}
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value.replace(/\D/g, ''))}
-                required
-                autoComplete="tel-national"
-              />
+              <IndianMobileInput value={contactPhone} onChange={setContactPhone} />
             </label>
           </CardContent>
         </Card>
@@ -285,15 +277,9 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
               </label>
               <label className="space-y-1">
                 <span className="text-sm font-medium">Mobile *</span>
-                <Input
-                  required
-                  type="tel"
-                  inputMode="numeric"
-                  pattern="[6-9][0-9]{9}"
-                  maxLength={10}
+                <IndianMobileInput
                   value={shipping.phone}
-                  onChange={(e) => setShip('phone', e.target.value.replace(/\D/g, ''))}
-                  autoComplete="tel-national"
+                  onChange={(v) => setShip('phone', v)}
                 />
               </label>
               <label className="space-y-1 md:col-span-2">
