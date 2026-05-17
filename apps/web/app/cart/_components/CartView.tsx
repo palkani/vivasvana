@@ -1,17 +1,20 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DiscountInput } from '@/components/storefront/DiscountInput';
 import { useCartStore, cartItemCount, cartSubtotal } from '@/lib/cart-store';
 import { formatINR, pluralize } from '@/lib/utils';
 import type { Cart } from '@/lib/types';
+import type { DiscountInfo } from '@/lib/discount';
 
 const FREE_SHIPPING_THRESHOLD = 400;
 const BASE_SHIPPING = 50;
+const DISCOUNT_STORAGE_KEY = 'vv_discount';
 
 interface Props {
   initialCart: Cart | null;
@@ -19,6 +22,7 @@ interface Props {
 
 export function CartView({ initialCart }: Props) {
   const { cart, updateItem, removeItem, fetch, loading } = useCartStore();
+  const [discount, setDiscount] = useState<DiscountInfo | null>(null);
 
   // Hydrate the persisted store from server snapshot on first render
   useEffect(() => {
@@ -27,15 +31,43 @@ export function CartView({ initialCart }: Props) {
     } else {
       fetch();
     }
+    // Restore any applied discount across page loads
+    try {
+      const raw = localStorage.getItem(DISCOUNT_STORAGE_KEY);
+      if (raw) setDiscount(JSON.parse(raw) as DiscountInfo);
+    } catch {
+      // ignore
+    }
   }, [initialCart, fetch]);
 
   const view = cart ?? initialCart;
   const items = view?.items ?? [];
   const subtotal = cartSubtotal(view);
   const count = cartItemCount(view);
-  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : BASE_SHIPPING;
-  const total = subtotal + shipping;
+  const discountAmount = discount ? Math.min(parseFloat(discount.appliedAmount), subtotal) : 0;
+  const baseShipping =
+    subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : BASE_SHIPPING;
+  const shipping = discount?.freeShipping ? 0 : baseShipping;
+  const total = Math.max(0, subtotal - discountAmount + shipping);
   const toFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
+
+  function applyDiscount(info: DiscountInfo) {
+    setDiscount(info);
+    try {
+      localStorage.setItem(DISCOUNT_STORAGE_KEY, JSON.stringify(info));
+    } catch {
+      // ignore
+    }
+  }
+
+  function clearDiscount() {
+    setDiscount(null);
+    try {
+      localStorage.removeItem(DISCOUNT_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  }
 
   if (items.length === 0) {
     return (
@@ -142,17 +174,29 @@ export function CartView({ initialCart }: Props) {
             <span>Subtotal</span>
             <span className="tabular-nums">{formatINR(subtotal)}</span>
           </div>
+          {discountAmount > 0 && (
+            <div className="flex justify-between text-leaf-600">
+              <span>Discount ({discount?.code})</span>
+              <span className="tabular-nums">−{formatINR(discountAmount)}</span>
+            </div>
+          )}
           <div className="flex justify-between">
             <span>Shipping</span>
             <span className="tabular-nums">
               {shipping === 0 ? <span className="text-leaf-600">Free</span> : formatINR(shipping)}
             </span>
           </div>
-          {toFreeShipping > 0 && (
+          {toFreeShipping > 0 && !discount?.freeShipping && (
             <p className="rounded-md bg-brand-50 p-3 text-xs text-brand-900">
               Add {formatINR(toFreeShipping)} more for free shipping.
             </p>
           )}
+          <DiscountInput
+            subtotal={subtotal}
+            applied={discount}
+            onApply={applyDiscount}
+            onClear={clearDiscount}
+          />
           <hr />
           <div className="flex justify-between text-base font-semibold">
             <span>Total</span>

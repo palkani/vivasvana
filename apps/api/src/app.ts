@@ -25,6 +25,7 @@ import adminProductRoutes from './routes/admin/products.js';
 import cartRoutes from './routes/cart.js';
 import addressRoutes from './routes/addresses.js';
 import indiaPostRoutes from './routes/india-post.js';
+import discountRoutes from './routes/discounts.js';
 
 export async function buildApp(opts: FastifyServerOptions = {}) {
   const app = Fastify({
@@ -89,6 +90,7 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
   await app.register(cartRoutes);
   await app.register(addressRoutes);
   await app.register(indiaPostRoutes);
+  await app.register(discountRoutes);
   // future: orders, payments, blog…
 
   return app;
