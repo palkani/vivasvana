@@ -121,3 +121,82 @@ export interface PinLookupResult {
   stateCode: string;
   serviceable: boolean;
 }
+
+export type OrderStatus =
+  | 'PENDING'
+  | 'CONFIRMED'
+  | 'PACKED'
+  | 'SHIPPED'
+  | 'DELIVERED'
+  | 'CANCELLED'
+  | 'RETURNED'
+  | 'REFUNDED';
+
+export type PaymentStatus =
+  | 'PENDING'
+  | 'AUTHORIZED'
+  | 'PAID'
+  | 'FAILED'
+  | 'REFUNDED'
+  | 'PARTIAL_REFUNDED';
+
+export type PaymentMethod = 'RAZORPAY' | 'COD' | 'STRIPE';
+
+export interface OrderItem {
+  id: string;
+  productId: string | null;
+  variantId: string | null;
+  title: string;
+  sku: string;
+  hsnCode: string;
+  quantity: number;
+  price: string;
+  taxRate: string;
+  total: string;
+}
+
+export interface OrderShipping {
+  id: string;
+  name: string;
+  phone: string;
+  addressLine: string;
+  landmark: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  carrier: string | null;
+  trackingNumber: string | null;
+  trackingUrl: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  userId: string | null;
+  email: string;
+  phone: string;
+  status: OrderStatus;
+  paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
+  subtotal: string;
+  shipping: string;
+  discount: string;
+  tax: string;
+  codFee: string;
+  total: string;
+  currency: string;
+  discountCode: string | null;
+  gstin: string | null;
+  companyName: string | null;
+  notes: string | null;
+  placedAt: string;
+  confirmedAt: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+  cancelledAt: string | null;
+  items: OrderItem[];
+  shippingAddress: OrderShipping | null;
+}
