@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { CheckoutForm } from './_components/CheckoutForm';
+import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { Cart, Address } from '@/lib/types';
@@ -42,8 +43,32 @@ async function fetchAddressesIfLoggedIn(): Promise<Address[]> {
 
 export default async function CheckoutPage() {
   const cart = await fetchCart();
+
+  // Nothing to check out → render an empty state instead of redirecting.
+  // redirect() from a server-component page throws NEXT_REDIRECT, which
+  // surfaces as a Console Error in the Next 15 dev overlay. Inline render
+  // is quiet AND gives clearer feedback ("here's why nothing happened").
   if (!cart || cart.items.length === 0) {
-    redirect('/cart');
+    return (
+      <div className="container py-20">
+        <div className="mx-auto max-w-md rounded-lg border bg-card p-10 text-center">
+          <h1 className="font-serif text-2xl font-semibold tracking-tight">
+            Nothing to check out
+          </h1>
+          <p className="mt-3 text-muted-foreground">
+            Your cart is empty. Add a product first, then come back.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Button asChild>
+              <Link href="/products">Shop products</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/account/orders">View past orders</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const supabase = await createSupabaseServerClient();
