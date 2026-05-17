@@ -27,6 +27,7 @@ import addressRoutes from './routes/addresses.js';
 import indiaPostRoutes from './routes/india-post.js';
 import discountRoutes from './routes/discounts.js';
 import orderRoutes from './routes/orders.js';
+import paymentRoutes from './routes/payments.js';
 
 export async function buildApp(opts: FastifyServerOptions = {}) {
   const app = Fastify({
@@ -93,7 +94,8 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
   await app.register(indiaPostRoutes);
   await app.register(discountRoutes);
   await app.register(orderRoutes);
-  // future: payments, blog…
+  await app.register(paymentRoutes);
+  // future: blog…
 
   return app;
 }
