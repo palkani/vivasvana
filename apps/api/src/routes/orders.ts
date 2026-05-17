@@ -97,6 +97,28 @@ export default async function orderRoutes(app: FastifyInstance) {
     },
   );
 
+  // -- Public lookup by UUID (used by /pay/:orderId during checkout) ------
+  // The order ID is a v4 UUID, so the URL itself is the capability. We DO NOT
+  // return payment details here — just enough to render the payment page.
+  app.get(
+    '/api/orders/by-id/:id',
+    {
+      schema: {
+        tags: ['orders'],
+        summary: 'Get an order by UUID (capability link — used right after checkout)',
+        params: z.object({ id: z.string().uuid() }),
+      },
+    },
+    async (req, reply) => {
+      const order = await app.prisma.order.findUnique({
+        where: { id: req.params.id },
+        include: { items: true, shippingAddress: true },
+      });
+      if (!order) return reply.notFound('Order not found');
+      return serializeMoney(order);
+    },
+  );
+
   // -- Public lookup (orderNumber + email) -------------------------------
   app.get(
     '/api/orders/lookup',
