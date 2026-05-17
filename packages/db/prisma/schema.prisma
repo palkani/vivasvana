@@ -258,8 +258,12 @@ model CartItem {
   product Product         @relation(fields: [productId], references: [id])
   variant ProductVariant? @relation(fields: [variantId], references: [id])
 
-  @@unique([cartId, productId, variantId])
+  // Note: no @@unique([cartId, productId, variantId]) because Postgres treats
+  // NULL as distinct in unique constraints, so two rows with the same
+  // (cart, product) and a null variant would both be allowed. The service
+  // layer enforces uniqueness via findFirst + update.
   @@index([cartId])
+  @@index([cartId, productId, variantId])
   @@map("cart_items")
 }
 
