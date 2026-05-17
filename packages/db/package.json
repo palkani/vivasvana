@@ -16,6 +16,7 @@
     "migrate:reset": "prisma migrate reset --force",
     "reset": "prisma migrate reset --force && pnpm seed",
     "seed": "tsx prisma/seed.ts",
+    "promote-admin": "tsx scripts/promote-admin.ts",
     "studio": "prisma studio",
     "format": "prisma format",
     "lint": "echo 'no-op'",
