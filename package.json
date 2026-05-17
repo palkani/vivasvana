@@ -23,6 +23,7 @@
     "db:studio": "pnpm --filter @vivasvana/db run studio",
     "db:reset": "pnpm --filter @vivasvana/db run reset",
     "admin:promote": "pnpm --filter @vivasvana/db run promote-admin",
+    "storage:init": "pnpm --filter @vivasvana/db run setup-storage",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:status": "supabase status",

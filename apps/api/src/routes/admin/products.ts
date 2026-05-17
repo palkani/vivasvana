@@ -34,6 +34,9 @@ const ProductInput = z.object({
   ingredients: z.string().optional(),
   howToUse: z.string().optional(),
   allergens: z.string().optional(),
+  // Images: array of public URLs. Order = sortOrder (0 = cover).
+  // On UPDATE this replaces the entire image set for the product.
+  images: z.array(z.string().url()).max(12).optional(),
 });
 
 const AdminListQuery = z.object({
@@ -97,28 +100,38 @@ export default async function adminProductRoutes(app: FastifyInstance) {
         },
       },
       async (req, reply) => {
-        const data = req.body;
-        const created = await service.create({
-          slug: data.slug,
-          title: data.title,
-          description: data.description,
-          shortDescription: data.shortDescription,
-          sku: data.sku,
-          hsnCode: data.hsnCode,
-          price: data.price,
-          salePrice: data.salePrice,
-          taxRate: data.taxRate,
-          weight: data.weight,
-          stock: data.stock,
-          lowStockAt: data.lowStockAt,
-          status: data.status,
-          isVegan: data.isVegan,
-          isGlutenFree: data.isGlutenFree,
-          metaTitle: data.metaTitle,
-          metaDescription: data.metaDescription,
-          ingredients: data.ingredients,
-          howToUse: data.howToUse,
-          allergens: data.allergens,
+        const { images, ...data } = req.body;
+        const created = await app.prisma.product.create({
+          data: {
+            slug: data.slug,
+            title: data.title,
+            description: data.description,
+            shortDescription: data.shortDescription,
+            sku: data.sku,
+            hsnCode: data.hsnCode,
+            price: data.price,
+            salePrice: data.salePrice,
+            taxRate: data.taxRate,
+            weight: data.weight,
+            stock: data.stock,
+            lowStockAt: data.lowStockAt,
+            status: data.status,
+            isVegan: data.isVegan,
+            isGlutenFree: data.isGlutenFree,
+            metaTitle: data.metaTitle,
+            metaDescription: data.metaDescription,
+            ingredients: data.ingredients,
+            howToUse: data.howToUse,
+            allergens: data.allergens,
+            ...(images && images.length > 0
+              ? {
+                  images: {
+                    create: images.map((url, i) => ({ url, sortOrder: i })),
+                  },
+                }
+              : {}),
+          },
+          include: { images: { orderBy: { sortOrder: 'asc' } } },
         });
         return reply.status(201).send(serializeMoney(created));
       },
@@ -129,14 +142,34 @@ export default async function adminProductRoutes(app: FastifyInstance) {
       {
         schema: {
           tags: ['admin', 'products'],
-          summary: 'Update a product',
+          summary: 'Update a product (replaces image set if images[] provided)',
           params: z.object({ id: z.string().uuid() }),
           body: ProductInput.partial(),
           security: [{ bearerAuth: [] }],
         },
       },
       async (req) => {
-        const updated = await service.update(req.params.id, req.body);
+        const { images, ...data } = req.body;
+        // Run as a transaction so an image swap is atomic with the update.
+        const updated = await app.prisma.$transaction(async (tx) => {
+          if (images !== undefined) {
+            await tx.productImage.deleteMany({ where: { productId: req.params.id } });
+            if (images.length > 0) {
+              await tx.productImage.createMany({
+                data: images.map((url, i) => ({
+                  productId: req.params.id,
+                  url,
+                  sortOrder: i,
+                })),
+              });
+            }
+          }
+          return tx.product.update({
+            where: { id: req.params.id },
+            data,
+            include: { images: { orderBy: { sortOrder: 'asc' } } },
+          });
+        });
         return serializeMoney(updated);
       },
     );

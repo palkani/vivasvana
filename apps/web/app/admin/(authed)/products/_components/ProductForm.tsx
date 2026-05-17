@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { adminApi } from '@/lib/admin-api';
 import type { ProductDetail } from '@/lib/types';
+import { ImageUpload, type UploadedImage } from './ImageUpload';
 
 interface Props {
   initial?: Partial<ProductDetail> & { id?: string };
@@ -65,6 +66,12 @@ function buildInitial(p?: Props['initial']): FormState {
 export function ProductForm({ initial, mode }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(buildInitial(initial));
+  // Images come from two sources: existing rows on the product (path: null —
+  // we don't try to delete the underlying Storage object when removed) or
+  // freshly uploaded files (path set to the Storage key).
+  const [images, setImages] = useState<UploadedImage[]>(
+    initial?.images?.map((img) => ({ url: img.url, path: null })) ?? [],
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -84,6 +91,7 @@ export function ProductForm({ initial, mode }: Props) {
     if (!form.metaTitle) delete payload.metaTitle;
     if (!form.metaDescription) delete payload.metaDescription;
     if (!form.allergens) delete payload.allergens;
+    payload.images = images.map((img) => img.url);
 
     startTransition(async () => {
       try {
@@ -134,6 +142,18 @@ export function ProductForm({ initial, mode }: Props) {
               required
             />
           </Field>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Images</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            First image is the cover. Drag images in or click to browse.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ImageUpload value={images} onChange={setImages} productSlug={form.slug} max={6} />
         </CardContent>
       </Card>
 
