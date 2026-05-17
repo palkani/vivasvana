@@ -97,3 +97,27 @@ export interface Cart {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface Address {
+  id: string;
+  userId: string;
+  name: string;
+  phone: string;
+  addressLine: string;
+  landmark: string | null;
+  city: string;
+  state: string;
+  pincode: string;
+  country: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PinLookupResult {
+  pincode: string;
+  city: string;
+  state: string;
+  stateCode: string;
+  serviceable: boolean;
+}

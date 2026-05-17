@@ -60,13 +60,29 @@ function extractToken(req: FastifyRequest): string | null {
 
 export default fp(
   async (app) => {
+    /**
+     * Load (or lazily create) the mirror User row for a verified Supabase JWT.
+     *
+     * Supabase Auth owns auth.users; we mirror to public.users so domain tables
+     * can FK to a single id. On first authenticated request from a new signup,
+     * the JWT is already verified, so it's safe to upsert a CUSTOMER row. Role
+     * promotion to ADMIN/STAFF happens via SQL/admin tools, not on signup.
+     */
     const loadUser = async (claims: { sub: string; email: string }): Promise<AuthUser | null> => {
-      const row = await app.prisma.user.findUnique({
+      const existing = await app.prisma.user.findUnique({
         where: { id: claims.sub },
         select: { id: true, email: true, role: true, deletedAt: true },
       });
-      if (!row || row.deletedAt) return null;
-      return { id: row.id, email: row.email, role: row.role };
+      if (existing) {
+        if (existing.deletedAt) return null;
+        return { id: existing.id, email: existing.email, role: existing.role };
+      }
+      // First seen — mirror Supabase identity into our domain user table.
+      const created = await app.prisma.user.create({
+        data: { id: claims.sub, email: claims.email || `${claims.sub}@user.local`, role: 'CUSTOMER' },
+        select: { id: true, email: true, role: true },
+      });
+      return created;
     };
 
     app.decorate('authenticate', async (req: FastifyRequest, reply: FastifyReply) => {
