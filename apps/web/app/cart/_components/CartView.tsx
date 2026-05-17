@@ -1,0 +1,173 @@
+'use client';
+
+import { useEffect } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
+import { Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useCartStore, cartItemCount, cartSubtotal } from '@/lib/cart-store';
+import { formatINR, pluralize } from '@/lib/utils';
+import type { Cart } from '@/lib/types';
+
+const FREE_SHIPPING_THRESHOLD = 400;
+const BASE_SHIPPING = 50;
+
+interface Props {
+  initialCart: Cart | null;
+}
+
+export function CartView({ initialCart }: Props) {
+  const { cart, updateItem, removeItem, fetch, loading } = useCartStore();
+
+  // Hydrate the persisted store from server snapshot on first render
+  useEffect(() => {
+    if (initialCart) {
+      useCartStore.setState({ cart: initialCart });
+    } else {
+      fetch();
+    }
+  }, [initialCart, fetch]);
+
+  const view = cart ?? initialCart;
+  const items = view?.items ?? [];
+  const subtotal = cartSubtotal(view);
+  const count = cartItemCount(view);
+  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD || subtotal === 0 ? 0 : BASE_SHIPPING;
+  const total = subtotal + shipping;
+  const toFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
+
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-4 rounded-lg border bg-card p-12 text-center">
+        <p className="text-5xl">🛒</p>
+        <h2 className="text-xl font-semibold">Your cart is empty</h2>
+        <p className="text-muted-foreground">Browse our millet blends to get started.</p>
+        <Button asChild>
+          <Link href="/products">Shop products</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          {count} {pluralize(count, 'item')} in cart
+        </p>
+
+        {items.map((item) => {
+          const image = item.product.images[0];
+          const maxStock = item.variant?.stock ?? item.product.stock;
+          const lineTotal = parseFloat(item.price) * item.quantity;
+          return (
+            <Card key={item.id}>
+              <CardContent className="flex items-center gap-4 p-4">
+                <Link
+                  href={`/products/${item.product.slug}`}
+                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-muted"
+                >
+                  {image && (
+                    <Image
+                      src={image.url}
+                      alt={image.altText ?? item.product.title}
+                      fill
+                      sizes="80px"
+                      className="object-cover"
+                    />
+                  )}
+                </Link>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/products/${item.product.slug}`}
+                    className="block truncate font-medium hover:text-primary"
+                  >
+                    {item.product.title}
+                  </Link>
+                  {item.variant && (
+                    <p className="text-xs text-muted-foreground">{item.variant.title}</p>
+                  )}
+                  <p className="mt-1 text-sm text-muted-foreground">{formatINR(item.price)} each</p>
+                </div>
+                <div className="flex items-center gap-1 rounded-md border">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-none"
+                    onClick={() => updateItem(item.id, item.quantity - 1)}
+                    disabled={loading}
+                    aria-label="Decrease quantity"
+                  >
+                    −
+                  </Button>
+                  <span className="w-8 text-center text-sm tabular-nums" aria-live="polite">
+                    {item.quantity}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-none"
+                    onClick={() => updateItem(item.id, item.quantity + 1)}
+                    disabled={loading || item.quantity >= maxStock}
+                    aria-label="Increase quantity"
+                  >
+                    +
+                  </Button>
+                </div>
+                <div className="w-20 text-right font-medium tabular-nums">
+                  {formatINR(lineTotal)}
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeItem(item.id)}
+                  disabled={loading}
+                  aria-label="Remove item"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card className="sticky top-20 h-fit">
+        <CardHeader>
+          <CardTitle className="text-lg">Order summary</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="flex justify-between">
+            <span>Subtotal</span>
+            <span className="tabular-nums">{formatINR(subtotal)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Shipping</span>
+            <span className="tabular-nums">
+              {shipping === 0 ? <span className="text-leaf-600">Free</span> : formatINR(shipping)}
+            </span>
+          </div>
+          {toFreeShipping > 0 && (
+            <p className="rounded-md bg-brand-50 p-3 text-xs text-brand-900">
+              Add {formatINR(toFreeShipping)} more for free shipping.
+            </p>
+          )}
+          <hr />
+          <div className="flex justify-between text-base font-semibold">
+            <span>Total</span>
+            <span className="tabular-nums">{formatINR(total)}</span>
+          </div>
+          <p className="text-xs text-muted-foreground">incl. GST · COD available</p>
+
+          <Button className="w-full" size="lg" asChild>
+            <Link href="/checkout">Checkout</Link>
+          </Button>
+          <Button variant="outline" className="w-full" asChild>
+            <Link href="/products">Continue shopping</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
