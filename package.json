@@ -1,0 +1,37 @@
+{
+  "name": "vivasvana",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Vivasvana ecommerce platform — Indian millet nutrition brand",
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20.11.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
+    "db:generate": "pnpm --filter @vivasvana/db run generate",
+    "db:migrate": "pnpm --filter @vivasvana/db run migrate",
+    "db:seed": "pnpm --filter @vivasvana/db run seed",
+    "db:studio": "pnpm --filter @vivasvana/db run studio",
+    "db:reset": "pnpm --filter @vivasvana/db run reset",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "prepare": "husky || true"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "prettier": "^3.3.3",
+    "prettier-plugin-tailwindcss": "^0.6.8",
+    "turbo": "^2.1.3",
+    "typescript": "^5.6.2"
+  }
+}
