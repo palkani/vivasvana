@@ -45,4 +45,13 @@
   .container-narrow {
     @apply mx-auto w-full max-w-3xl px-4;
   }
+
+  /* Cross-browser hidden scrollbar — keeps scroll functional. */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
