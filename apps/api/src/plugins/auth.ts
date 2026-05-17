@@ -2,6 +2,7 @@ import fp from 'fastify-plugin';
 import { jwtVerify } from 'jose';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { env } from '../config/env.js';
+import { NotificationService } from '../services/notification.service.js';
 
 /**
  * Auth model:
@@ -60,6 +61,8 @@ function extractToken(req: FastifyRequest): string | null {
 
 export default fp(
   async (app) => {
+    const notifications = new NotificationService(app.prisma);
+
     /**
      * Load (or lazily create) the mirror User row for a verified Supabase JWT.
      *
@@ -77,11 +80,13 @@ export default fp(
         if (existing.deletedAt) return null;
         return { id: existing.id, email: existing.email, role: existing.role };
       }
-      // First seen — mirror Supabase identity into our domain user table.
+      // First seen — mirror Supabase identity into our domain user table
+      // and fire the welcome email asynchronously.
       const created = await app.prisma.user.create({
         data: { id: claims.sub, email: claims.email || `${claims.sub}@user.local`, role: 'CUSTOMER' },
         select: { id: true, email: true, role: true },
       });
+      void notifications.sendWelcome({ email: created.email });
       return created;
     };
 

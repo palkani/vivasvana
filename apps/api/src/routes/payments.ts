@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { PaymentService } from '../services/payment.service.js';
+import { NotificationService } from '../services/notification.service.js';
 import { serializeMoney } from '../lib/decimal.js';
 
 function mapPaymentError(err: unknown, reply: FastifyReply) {
@@ -19,6 +20,7 @@ const PayOrderParams = z.object({ orderId: z.string().uuid() });
 
 export default async function paymentRoutes(app: FastifyInstance) {
   const service = new PaymentService(app.prisma);
+  const notifications = new NotificationService(app.prisma);
 
   // -- Create a (mock) payment intent for an order -----------------------
   app.post(
@@ -61,6 +63,9 @@ export default async function paymentRoutes(app: FastifyInstance) {
     async (req, reply) => {
       try {
         const order = await service.confirmMock(req.params.orderId, req.body);
+        if (req.body.success) {
+          void notifications.sendOrderConfirmation(order.id);
+        }
         return serializeMoney(order);
       } catch (err) {
         return mapPaymentError(err, reply);
@@ -81,6 +86,7 @@ export default async function paymentRoutes(app: FastifyInstance) {
     async (req, reply) => {
       try {
         const order = await service.confirmCOD(req.params.orderId);
+        void notifications.sendOrderConfirmation(order.id);
         return serializeMoney(order);
       } catch (err) {
         return mapPaymentError(err, reply);
