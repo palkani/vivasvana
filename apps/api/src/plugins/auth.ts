@@ -110,6 +110,19 @@ export default fp(
     });
 
     app.decorate('requireAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
+      // Dev-only bypass: when ADMIN_AUTH_DISABLED is set AND we are NOT in
+      // production, treat every request as a logged-in stub admin. The
+      // NODE_ENV gate is intentional — even if the flag is mistakenly set
+      // in prod env vars, prod refuses to honor it.
+      if (env.NODE_ENV !== 'production' && env.ADMIN_AUTH_DISABLED) {
+        req.user = {
+          id: '00000000-0000-0000-0000-000000000001',
+          email: 'dev@local',
+          role: 'ADMIN',
+        };
+        app.log.warn('admin auth bypassed (ADMIN_AUTH_DISABLED=true, dev only)');
+        return;
+      }
       await app.authenticate(req, reply);
       if (reply.sent) return;
       if (!req.user || (req.user.role !== 'ADMIN' && req.user.role !== 'STAFF')) {

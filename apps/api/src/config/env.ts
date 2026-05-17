@@ -27,6 +27,12 @@ const EnvSchema = z.object({
   SHIPROCKET_EMAIL: z.string().optional(),
   SHIPROCKET_PASSWORD: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+
+  // Dev-only admin bypass — IGNORED when NODE_ENV=production (see auth plugin).
+  ADMIN_AUTH_DISABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true' || v === '1'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

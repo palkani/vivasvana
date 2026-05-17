@@ -16,6 +16,11 @@ import { env } from '@/lib/env';
 const ADMIN_LOGIN_PATH = '/admin/login';
 const ACCOUNT_LOGIN_PATH = '/account/login';
 
+// Dev-only bypass for /admin/*. Honored only when not in production.
+const ADMIN_AUTH_DISABLED =
+  process.env.NODE_ENV !== 'production' &&
+  process.env.NEXT_PUBLIC_ADMIN_AUTH_DISABLED === 'true';
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -36,8 +41,14 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  // /admin/* requires auth (excluding the login page itself)
-  if (path.startsWith('/admin') && path !== ADMIN_LOGIN_PATH && !user) {
+  // /admin/* requires auth (excluding the login page itself).
+  // Skipped entirely in dev when ADMIN_AUTH_DISABLED is set.
+  if (
+    !ADMIN_AUTH_DISABLED &&
+    path.startsWith('/admin') &&
+    path !== ADMIN_LOGIN_PATH &&
+    !user
+  ) {
     const url = request.nextUrl.clone();
     url.pathname = ADMIN_LOGIN_PATH;
     url.searchParams.set('redirectTo', path);

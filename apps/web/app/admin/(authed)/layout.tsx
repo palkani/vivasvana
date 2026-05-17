@@ -1,15 +1,32 @@
 import Link from 'next/link';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { AdminSidebar } from './_components/AdminSidebar';
+import { DevAuthBanner } from './_components/DevAuthBanner';
+
+const ADMIN_AUTH_DISABLED =
+  process.env.NODE_ENV !== 'production' &&
+  process.env.NEXT_PUBLIC_ADMIN_AUTH_DISABLED === 'true';
 
 /**
- * Auth gate lives in middleware.ts. /admin/login sits OUTSIDE this layout
- * (it's at app/admin/login while this wraps app/admin/(authed)/*) so a
- * logged-out visitor can reach the login page without tripping this guard.
+ * Auth gate lives in middleware.ts. /admin/login sits OUTSIDE this layout.
  *
- * Graceful fallback when user is null — no throw → no dev overlay error.
+ * Dev bypass: when ADMIN_AUTH_DISABLED is set (and non-prod), skip the
+ * Supabase call entirely and render the admin shell with a stub identity
+ * plus a visible warning banner so the bypass is never invisible.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  if (ADMIN_AUTH_DISABLED) {
+    return (
+      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_1fr]">
+        <AdminSidebar userEmail="dev@local (auth disabled)" devMode />
+        <main className="bg-muted/30">
+          <DevAuthBanner />
+          <div className="p-4 md:p-8">{children}</div>
+        </main>
+      </div>
+    );
+  }
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },

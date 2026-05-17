@@ -17,7 +17,12 @@ const nav = [
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
-export function AdminSidebar({ userEmail }: { userEmail: string }) {
+interface Props {
+  userEmail: string;
+  devMode?: boolean;
+}
+
+export function AdminSidebar({ userEmail, devMode = false }: Props) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -62,10 +67,17 @@ export function AdminSidebar({ userEmail }: { userEmail: string }) {
 
       <div className="mt-4 border-t pt-4">
         <p className="truncate px-2 text-xs text-muted-foreground">{userEmail}</p>
-        <Button variant="ghost" size="sm" className="mt-2 w-full justify-start" onClick={signOut}>
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign out
-        </Button>
+        {!devMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2 w-full justify-start"
+            onClick={signOut}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign out
+          </Button>
+        )}
       </div>
     </aside>
   );
