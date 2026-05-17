@@ -100,7 +100,10 @@ function HeroArtwork({ productImages }: { productImages: Props['productImages'] 
         </p>
       </div>
 
-      {/* Two product packshots */}
+      {/* Two product packshots — only the first gets `priority` (it's the
+          LCP candidate). The second loads with normal eagerness, which
+          avoids "preload not used" warnings when users navigate away
+          before both images settle. */}
       {images[0] && (
         <div className="absolute bottom-0 left-2 z-20 h-[68%] w-[44%] rotate-[-6deg]">
           <Image
@@ -119,7 +122,6 @@ function HeroArtwork({ productImages }: { productImages: Props['productImages'] 
             src={images[1].url}
             alt={images[1].alt}
             fill
-            priority
             sizes="(min-width: 1024px) 280px, 40vw"
             className="object-contain drop-shadow-xl"
           />
