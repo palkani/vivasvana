@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { IndianMobileInput } from '@/components/storefront/IndianMobileInput';
 import { PincodeStatus } from '@/components/storefront/PincodeStatus';
+import { CitySelect } from '@/components/storefront/CitySelect';
 import { INDIA_STATES, stateName } from '@/lib/india-states';
 import { formatINR } from '@/lib/utils';
 import { api } from '@/lib/api';
@@ -301,11 +302,10 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
               </label>
               <label className="space-y-1">
                 <span className="text-sm font-medium">City *</span>
-                <Input
-                  required
+                <CitySelect
+                  stateCode={shipping.state}
                   value={shipping.city}
-                  onChange={(e) => setShip('city', e.target.value)}
-                  autoComplete="address-level2"
+                  onChange={(v) => setShip('city', v)}
                 />
               </label>
               <label className="space-y-1 md:col-span-2">

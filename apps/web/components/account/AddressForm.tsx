@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { IndianMobileInput } from '@/components/storefront/IndianMobileInput';
 import { PincodeStatus } from '@/components/storefront/PincodeStatus';
+import { CitySelect } from '@/components/storefront/CitySelect';
 import { accountApi } from '@/lib/account-api';
 import { INDIA_STATES } from '@/lib/india-states';
 import { usePincodeLookup } from '@/lib/use-pincode-lookup';
@@ -116,11 +117,10 @@ export function AddressForm({ initial, onSaved, onCancel }: Props) {
 
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">City *</span>
-            <Input
-              required
+            <CitySelect
+              stateCode={form.state}
               value={form.city}
-              onChange={(e) => update('city', e.target.value)}
-              autoComplete="address-level2"
+              onChange={(v) => update('city', v)}
             />
           </label>
 
