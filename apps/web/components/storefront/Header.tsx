@@ -5,7 +5,7 @@ import { SunMark } from './SunMark';
 
 const nav = [
   { href: '/', label: 'Home' },
-  { href: '/products', label: 'Catalog' },
+  { href: '/products', label: 'Products' },
   { href: '/contact', label: 'Contact' },
   { href: '/blog', label: 'Wellness Blog' },
 ];

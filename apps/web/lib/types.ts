@@ -33,7 +33,7 @@ export interface ProductDetail extends ProductCardData {
   weight: string | null;
   hsnCode: string;
   taxRate: string;
-  fssaiLicense: string;
+  fssaiLicense: string | null;
   countryOfOrigin: string;
   metaTitle: string | null;
   metaDescription: string | null;

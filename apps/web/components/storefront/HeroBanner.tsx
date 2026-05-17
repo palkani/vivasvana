@@ -33,7 +33,7 @@ export function HeroBanner({ productImages = [] }: Props) {
         {/* ---- Copy ------------------------------------------------------ */}
         <div className="space-y-6">
           <p className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium tracking-wide text-brand-800">
-            <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> FSSAI No. 11225303000627
+            <ShieldCheck className="h-3.5 w-3.5" aria-hidden /> FSSAI Certified · Plant-Based · Made in India
           </p>
 
           <h1 className="font-serif text-5xl font-bold uppercase leading-[0.95] tracking-tight text-brand-900 md:text-6xl lg:text-7xl">

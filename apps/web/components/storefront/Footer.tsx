@@ -14,7 +14,7 @@ export function Footer() {
             <p className="mt-3 text-sm text-muted-foreground">
               Plant-based millet superfoods for everyday Indian nutrition.
             </p>
-            <p className="mt-2 text-xs text-muted-foreground">FSSAI No. 11225303000627</p>
+            <p className="mt-2 text-xs text-muted-foreground">FSSAI Certified · Made in India</p>
           </div>
 
           <div>

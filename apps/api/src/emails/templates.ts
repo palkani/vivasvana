@@ -30,7 +30,7 @@ function layout(opts: { title: string; preheader?: string; body: string }): stri
       <p style="margin: 0 0 12px;"><strong style="font-family: Georgia, serif; font-size: 20px; color: ${BRAND};">Vivasvana</strong></p>
       ${opts.body}
     </div>
-    <p class="footer">Vivasvana · FSSAI No. 11225303000627<br>© ${new Date().getFullYear()} Vivasvana. Made in India.</p>
+    <p class="footer">Vivasvana · FSSAI Certified<br>© ${new Date().getFullYear()} Vivasvana. Made in India.</p>
   </body>
 </html>`;
 }

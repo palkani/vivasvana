@@ -90,7 +90,7 @@ export default async function ProductPage({ params }: PageProps) {
             <div className="flex flex-wrap items-center gap-2">
               {product.isVegan && <Badge variant="success">Vegan</Badge>}
               {product.isGlutenFree && <Badge variant="success">Gluten-free</Badge>}
-              <Badge variant="outline">FSSAI {product.fssaiLicense}</Badge>
+              <Badge variant="outline">FSSAI Certified</Badge>
             </div>
 
             <h1 className="font-serif text-3xl font-semibold tracking-tight md:text-4xl">
