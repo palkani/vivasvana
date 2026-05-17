@@ -23,6 +23,8 @@ import healthRoutes from './routes/health.js';
 import productRoutes from './routes/products.js';
 import adminProductRoutes from './routes/admin/products.js';
 import cartRoutes from './routes/cart.js';
+import addressRoutes from './routes/addresses.js';
+import indiaPostRoutes from './routes/india-post.js';
 
 export async function buildApp(opts: FastifyServerOptions = {}) {
   const app = Fastify({
@@ -85,7 +87,9 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
   await app.register(productRoutes);
   await app.register(adminProductRoutes);
   await app.register(cartRoutes);
-  // future: auth, orders, blog…
+  await app.register(addressRoutes);
+  await app.register(indiaPostRoutes);
+  // future: orders, payments, blog…
 
   return app;
 }
