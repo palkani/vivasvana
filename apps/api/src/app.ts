@@ -20,6 +20,8 @@ import errorHandler from './plugins/error-handler.js';
 import { env } from './config/env.js';
 
 import healthRoutes from './routes/health.js';
+import productRoutes from './routes/products.js';
+import adminProductRoutes from './routes/admin/products.js';
 
 export async function buildApp(opts: FastifyServerOptions = {}) {
   const app = Fastify({
@@ -79,7 +81,9 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
 
   // Routes
   await app.register(healthRoutes);
-  // future: products, cart, auth, orders, blog…
+  await app.register(productRoutes);
+  await app.register(adminProductRoutes);
+  // future: cart, auth, orders, blog…
 
   return app;
 }
