@@ -4,7 +4,6 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { IndianMobileInput } from '@/components/storefront/IndianMobileInput';
 import { PincodeStatus } from '@/components/storefront/PincodeStatus';
 import { CitySelect } from '@/components/storefront/CitySelect';
 import { accountApi } from '@/lib/account-api';
@@ -77,7 +76,15 @@ export function AddressForm({ initial, onSaved, onCancel }: Props) {
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">Mobile *</span>
-            <IndianMobileInput value={form.phone} onChange={(v) => update('phone', v)} />
+            <Input
+              required
+              type="tel"
+              inputMode="tel"
+              value={form.phone}
+              onChange={(e) => update('phone', e.target.value)}
+              autoComplete="tel"
+              placeholder="Phone number"
+            />
           </label>
 
           <label className="flex flex-col gap-1 md:col-span-2">

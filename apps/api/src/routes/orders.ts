@@ -6,12 +6,16 @@ import { serializeMoney } from '../lib/decimal.js';
 
 const SESSION_COOKIE = 'vv_cart_sid';
 
-const IN_PHONE = /^[6-9]\d{9}$/;
 const IN_PINCODE = /^[1-9]\d{5}$/;
+
+// Phone validation permissive: 7-20 chars covers India + intl. formats.
+// Frontend doesn't enforce a pattern either. Re-tighten to ^[6-9]\d{9}$
+// when we lock to India-only deliveries.
+const PHONE = z.string().min(7).max(20);
 
 const ShippingBody = z.object({
   name: z.string().min(1).max(120),
-  phone: z.string().regex(IN_PHONE),
+  phone: PHONE,
   addressLine: z.string().min(5).max(240),
   landmark: z.string().max(120).optional(),
   city: z.string().min(1).max(80),
@@ -22,7 +26,7 @@ const ShippingBody = z.object({
 
 const CreateOrderBody = z.object({
   email: z.string().email(),
-  phone: z.string().regex(IN_PHONE),
+  phone: PHONE,
   paymentMethod: z.enum(['RAZORPAY', 'COD', 'STRIPE']),
   shipping: ShippingBody,
   discountCode: z.string().max(40).optional(),

@@ -2,14 +2,18 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { AddressService } from '../services/address.service.js';
 
-const IN_PHONE = /^[6-9]\d{9}$/;
 const IN_PINCODE = /^[1-9]\d{5}$/;
 // ISO 3166-2:IN codes — see https://en.wikipedia.org/wiki/ISO_3166-2:IN
 const IN_STATE = z.string().min(2).max(3);
 
+// Phone validation kept permissive — accepts Indian + international numbers.
+// Sanity-check the length only; pretty-printing/format normalization is the
+// frontend's job. Tighten this to /^[6-9]\d{9}$/ later if we go India-only.
+const PHONE = z.string().min(7).max(20);
+
 const AddressBody = z.object({
   name: z.string().min(1).max(120),
-  phone: z.string().regex(IN_PHONE, 'invalid Indian mobile number'),
+  phone: PHONE,
   addressLine: z.string().min(5).max(240),
   landmark: z.string().max(120).optional(),
   city: z.string().min(1).max(80),

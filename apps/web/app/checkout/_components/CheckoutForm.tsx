@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { IndianMobileInput } from '@/components/storefront/IndianMobileInput';
 import { PincodeStatus } from '@/components/storefront/PincodeStatus';
 import { CitySelect } from '@/components/storefront/CitySelect';
 import { INDIA_STATES, stateName } from '@/lib/india-states';
@@ -192,7 +191,15 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
             </label>
             <label className="space-y-1">
               <span className="text-sm font-medium">Mobile *</span>
-              <IndianMobileInput value={contactPhone} onChange={setContactPhone} />
+              <Input
+                type="tel"
+                inputMode="tel"
+                value={contactPhone}
+                onChange={(e) => setContactPhone(e.target.value)}
+                required
+                autoComplete="tel"
+                placeholder="Phone number"
+              />
             </label>
           </CardContent>
         </Card>
@@ -263,9 +270,14 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
               </label>
               <label className="space-y-1">
                 <span className="text-sm font-medium">Mobile *</span>
-                <IndianMobileInput
+                <Input
+                  type="tel"
+                  inputMode="tel"
+                  required
                   value={shipping.phone}
-                  onChange={(v) => setShip('phone', v)}
+                  onChange={(e) => setShip('phone', e.target.value)}
+                  autoComplete="tel"
+                  placeholder="Phone number"
                 />
               </label>
               <label className="space-y-1 md:col-span-2">
