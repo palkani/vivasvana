@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { SunMark } from './SunMark';
 
 export function Footer() {
   return (
@@ -7,9 +8,7 @@ export function Footer() {
         <div className="grid gap-8 md:grid-cols-4">
           <div>
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground font-serif text-lg">
-                V
-              </div>
+              <SunMark className="h-9 w-9" />
               <span className="font-serif text-xl font-semibold">Vivasvana</span>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">

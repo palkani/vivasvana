@@ -1,31 +1,41 @@
 import Link from 'next/link';
 import { ShoppingBag, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SunMark } from './SunMark';
+
+const nav = [
+  { href: '/', label: 'Home' },
+  { href: '/products', label: 'Catalog' },
+  { href: '/contact', label: 'Contact' },
+  { href: '/blog', label: 'Wellness Blog' },
+];
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground font-serif text-lg">
-            V
-          </div>
-          <span className="font-serif text-xl font-semibold tracking-tight">Vivasvana</span>
+    <header className="sticky top-0 z-40 w-full border-b border-brand-100 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+      <div className="container flex h-20 items-center justify-between gap-6">
+        <Link href="/" className="flex items-center gap-3" aria-label="Vivasvana home">
+          <SunMark className="h-10 w-10 shrink-0" />
+          <span className="flex flex-col leading-tight">
+            <span className="font-serif text-2xl font-semibold tracking-tight text-brand-700">
+              Vivasvana
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+              Mindful nourishment made pure
+            </span>
+          </span>
         </Link>
 
-        <nav className="hidden items-center gap-8 md:flex">
-          <Link href="/products" className="text-sm font-medium hover:text-primary">
-            Shop
-          </Link>
-          <Link href="/blog" className="text-sm font-medium hover:text-primary">
-            Blog
-          </Link>
-          <Link href="/about" className="text-sm font-medium hover:text-primary">
-            About
-          </Link>
-          <Link href="/contact" className="text-sm font-medium hover:text-primary">
-            Contact
-          </Link>
+        <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
+          {nav.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="text-sm font-medium text-foreground/80 transition-colors hover:text-brand-700"
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
         <div className="flex items-center gap-1">

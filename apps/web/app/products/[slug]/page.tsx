@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { Leaf, Sprout, Truck, MapPin } from 'lucide-react';
 import { api, type ApiError } from '@/lib/api';
 import type { ProductDetail } from '@/lib/types';
 import { formatINR } from '@/lib/utils';
@@ -122,12 +123,20 @@ export default async function ProductPage({ params }: PageProps) {
 
             <AddToCartForm productId={product.id} maxQuantity={Math.min(product.stock, 10)} />
 
-            <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
-              <div>🌾 100% plant-based</div>
-              <div>🏭 No refined sugar</div>
-              <div>📦 Free shipping over ₹400</div>
-              <div>🇮🇳 Made in {product.countryOfOrigin}</div>
-            </div>
+            <ul className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
+              <li className="flex items-center gap-2">
+                <Leaf className="h-3.5 w-3.5 text-leaf-600" aria-hidden /> 100% plant-based
+              </li>
+              <li className="flex items-center gap-2">
+                <Sprout className="h-3.5 w-3.5 text-leaf-600" aria-hidden /> No refined sugar
+              </li>
+              <li className="flex items-center gap-2">
+                <Truck className="h-3.5 w-3.5 text-brand-600" aria-hidden /> Free shipping over ₹400
+              </li>
+              <li className="flex items-center gap-2">
+                <MapPin className="h-3.5 w-3.5 text-brand-600" aria-hidden /> Made in {product.countryOfOrigin}
+              </li>
+            </ul>
 
             <Button variant="outline" asChild>
               <a

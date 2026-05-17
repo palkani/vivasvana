@@ -17,8 +17,10 @@ export function ProductGallery({ images, title }: Props) {
 
   if (!current) {
     return (
-      <div className="flex aspect-square items-center justify-center rounded-lg bg-muted text-6xl">
-        🌾
+      <div className="flex aspect-square items-center justify-center rounded-lg bg-brand-50">
+        <span className="text-xs uppercase tracking-widest text-muted-foreground">
+          No image yet
+        </span>
       </div>
     );
   }

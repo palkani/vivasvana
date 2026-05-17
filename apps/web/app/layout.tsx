@@ -3,6 +3,7 @@ import { Inter, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/storefront/Header';
 import { Footer } from '@/components/storefront/Footer';
+import { TrustStrip } from '@/components/storefront/TrustStrip';
 import { cn } from '@/lib/utils';
 
 const inter = Inter({
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={cn(inter.variable, playfair.variable)}>
       <body className="flex min-h-screen flex-col font-sans">
         <Header />
+        <TrustStrip />
         <main className="flex-1">{children}</main>
         <Footer />
       </body>

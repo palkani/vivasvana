@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { SunMark } from '@/components/storefront/SunMark';
 import { formatINR } from '@/lib/utils';
 import type { ProductCardData } from '@/lib/types';
 
@@ -24,7 +25,9 @@ export function ProductCard({ product }: { product: ProductCardData }) {
               className="object-cover transition-transform group-hover:scale-105"
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-4xl">🌾</div>
+            <div className="flex h-full items-center justify-center bg-brand-100">
+              <SunMark className="h-16 w-16 opacity-60" />
+            </div>
           )}
           {isOnSale && (
             <Badge variant="default" className="absolute left-3 top-3">
