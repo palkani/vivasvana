@@ -7,12 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { IndianMobileInput } from '@/components/storefront/IndianMobileInput';
+import { PincodeStatus } from '@/components/storefront/PincodeStatus';
 import { INDIA_STATES, stateName } from '@/lib/india-states';
 import { formatINR } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useCartStore, cartSubtotal } from '@/lib/cart-store';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import type { Cart, Address, Order, PaymentMethod, PinLookupResult } from '@/lib/types';
+import { usePincodeLookup } from '@/lib/use-pincode-lookup';
+import type { Cart, Address, Order, PaymentMethod } from '@/lib/types';
 import type { DiscountInfo } from '@/lib/discount';
 
 interface Props {
@@ -56,9 +58,17 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
   );
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('RAZORPAY');
   const [discount, setDiscount] = useState<DiscountInfo | null>(null);
-  const [pinLookup, setPinLookup] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // PIN → city/state auto-fill. Always overrides when a NEW PIN resolves —
+  // PIN is the source of truth for city/state; manual edits can happen after.
+  const pinLookupState = usePincodeLookup(
+    useSavedId ? '' : shipping.pincode,
+    (r) => {
+      setShipping((prev) => ({ ...prev, city: r.city, state: r.stateCode }));
+    },
+  );
 
   // restore discount applied on /cart
   useEffect(() => {
@@ -87,31 +97,6 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
     setContactPhone((p) => p || a.phone);
   }, [useSavedId, savedAddresses]);
 
-  // PIN → city/state auto-fill when entering a new address
-  useEffect(() => {
-    if (useSavedId) return;
-    const pin = shipping.pincode;
-    if (!/^[1-9]\d{5}$/.test(pin)) return;
-    let cancelled = false;
-    setPinLookup('looking up…');
-    (async () => {
-      try {
-        const r = await api.get<PinLookupResult>(`/api/pincode/${pin}`);
-        if (cancelled) return;
-        setPinLookup(`${r.city}, ${r.state}`);
-        setShipping((prev) => ({
-          ...prev,
-          city: prev.city || r.city,
-          state: prev.state || r.stateCode,
-        }));
-      } catch {
-        if (!cancelled) setPinLookup('not serviceable');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [shipping.pincode, useSavedId]);
 
   const items = initialCart.items;
   const subtotal = cartSubtotal(initialCart);
@@ -310,10 +295,9 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
                   value={shipping.pincode}
                   onChange={(e) => setShip('pincode', e.target.value.replace(/\D/g, ''))}
                   autoComplete="postal-code"
+                  placeholder="6-digit PIN"
                 />
-                {pinLookup && (
-                  <span className="text-xs text-muted-foreground">{pinLookup}</span>
-                )}
+                <PincodeStatus state={pinLookupState} />
               </label>
               <label className="space-y-1">
                 <span className="text-sm font-medium">City *</span>

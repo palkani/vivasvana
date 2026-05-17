@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useTransition, useEffect, useRef } from 'react';
+import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { IndianMobileInput } from '@/components/storefront/IndianMobileInput';
+import { PincodeStatus } from '@/components/storefront/PincodeStatus';
 import { accountApi } from '@/lib/account-api';
 import { INDIA_STATES } from '@/lib/india-states';
-import { api } from '@/lib/api';
-import type { Address, PinLookupResult } from '@/lib/types';
+import { usePincodeLookup } from '@/lib/use-pincode-lookup';
+import type { Address } from '@/lib/types';
 
 interface Props {
   initial?: Partial<Address>;
@@ -30,35 +31,12 @@ const EMPTY = {
 export function AddressForm({ initial, onSaved, onCancel }: Props) {
   const [form, setForm] = useState({ ...EMPTY, ...(initial ?? {}) });
   const [error, setError] = useState<string | null>(null);
-  const [pinLookup, setPinLookup] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const lastLookedUp = useRef('');
 
-  // Auto-fill city + state when a valid PIN is entered
-  useEffect(() => {
-    const pin = form.pincode?.trim();
-    if (!pin || !/^[1-9]\d{5}$/.test(pin) || pin === lastLookedUp.current) return;
-    lastLookedUp.current = pin;
-    let cancelled = false;
-    setPinLookup('looking up…');
-    (async () => {
-      try {
-        const res = await api.get<PinLookupResult>(`/api/pincode/${pin}`);
-        if (cancelled) return;
-        setPinLookup(`${res.city}, ${res.state}`);
-        setForm((prev) => ({
-          ...prev,
-          city: prev.city || res.city,
-          state: prev.state || res.stateCode,
-        }));
-      } catch {
-        if (!cancelled) setPinLookup('not serviceable');
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [form.pincode]);
+  // PIN → city/state auto-fill (debounced, always overrides)
+  const pinLookupState = usePincodeLookup(form.pincode, (r) => {
+    setForm((prev) => ({ ...prev, city: r.city, state: r.stateCode }));
+  });
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -131,8 +109,9 @@ export function AddressForm({ initial, onSaved, onCancel }: Props) {
               value={form.pincode}
               onChange={(e) => update('pincode', e.target.value.replace(/\D/g, ''))}
               autoComplete="postal-code"
+              placeholder="6-digit PIN"
             />
-            {pinLookup && <span className="text-xs text-muted-foreground">{pinLookup}</span>}
+            <PincodeStatus state={pinLookupState} />
           </label>
 
           <label className="flex flex-col gap-1">
