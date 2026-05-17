@@ -1,9 +1,23 @@
 import { CITIES_BY_STATE } from './india-cities-data';
 
-/** Return the city list for an ISO 3166-2:IN state code. Empty if unknown. */
+/**
+ * Return the city list for an ISO 3166-2:IN state code. Empty if unknown.
+ * Defensively deduplicates (case-insensitive) so a stray dataset duplicate
+ * never crashes React with a key collision in the consuming combobox.
+ */
 export function citiesForState(stateCode: string | undefined | null): readonly string[] {
   if (!stateCode) return [];
-  return CITIES_BY_STATE[stateCode] ?? [];
+  const raw = CITIES_BY_STATE[stateCode];
+  if (!raw) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const name of raw) {
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
 }
 
 /** Case-insensitive membership check; falls through to true for empty list. */

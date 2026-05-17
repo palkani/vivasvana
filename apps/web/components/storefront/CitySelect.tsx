@@ -63,8 +63,10 @@ export function CitySelect({
       />
       {datalistId && (
         <datalist id={datalistId}>
-          {cities.map((c) => (
-            <option key={c} value={c} />
+          {cities.map((c, i) => (
+            // Index in key as belt-and-braces against future dataset dupes;
+            // citiesForState already dedupes but defense-in-depth is cheap.
+            <option key={`${c}-${i}`} value={c} />
           ))}
         </datalist>
       )}

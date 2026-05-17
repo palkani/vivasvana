@@ -195,10 +195,9 @@ export const CITIES_BY_STATE: Record<string, readonly string[]> = {
     'Nilgiris', 'Ooty', 'Palani', 'Paramakudi', 'Perambalur', 'Pollachi',
     'Pudukkottai', 'Ramanathapuram', 'Ranipet', 'Rajapalayam', 'Salem',
     'Sankarankovil', 'Sivagangai', 'Sivakasi', 'Tenkasi', 'Thanjavur',
-    'Theni', 'Thiruvallur', 'Thiruvannamalai', 'Thiruvarur', 'Thoothukudi',
-    'Tirunelveli', 'Tirupathur', 'Tiruchengode', 'Tiruchirappalli',
-    'Tirunelveli', 'Tirupattur', 'Tiruppur', 'Tirupur', 'Tiruvallur',
-    'Tiruvannamalai', 'Tuticorin', 'Udhagamandalam', 'Udumalpet', 'Vandavasi',
+    'Theni', 'Thoothukudi', 'Tirunelveli', 'Tiruchengode', 'Tiruchirappalli',
+    'Tirupathur', 'Tirupattur', 'Tiruppur', 'Tiruvallur', 'Tiruvannamalai',
+    'Tiruvarur', 'Udhagamandalam', 'Udumalpet', 'Vandavasi',
     'Vellore', 'Villupuram', 'Virudhunagar',
   ],
   TG: [
