@@ -1,7 +1,7 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { ShoppingBag, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SunMark } from './SunMark';
 
 const nav = [
   { href: '/', label: 'Home' },
@@ -14,16 +14,18 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-brand-100 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container flex h-20 items-center justify-between gap-6">
-        <Link href="/" className="flex items-center gap-3" aria-label="Vivasvana home">
-          <SunMark className="h-10 w-10 shrink-0" />
-          <span className="flex flex-col leading-tight">
-            <span className="font-serif text-2xl font-semibold tracking-tight text-brand-700">
-              Vivasvana
-            </span>
-            <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              Mindful nourishment made pure
-            </span>
-          </span>
+        {/* The brand logo PNG already contains the sun mark, "Vivasvana"
+            wordmark, and "Mindful nourishment made pure" tagline — so
+            this single image IS the lockup, no separate HTML text. */}
+        <Link href="/" className="flex items-center" aria-label="Vivasvana — home">
+          <Image
+            src="/brand/logo.png"
+            alt="Vivasvana — Mindful nourishment made pure"
+            width={60}
+            height={60}
+            priority
+            className="h-14 w-auto md:h-16"
+          />
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">

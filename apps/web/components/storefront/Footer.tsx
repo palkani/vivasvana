@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { SunMark } from './SunMark';
+import Image from 'next/image';
 
 export function Footer() {
   return (
@@ -7,10 +7,13 @@ export function Footer() {
       <div className="container py-12">
         <div className="grid gap-8 md:grid-cols-4">
           <div>
-            <div className="flex items-center gap-2">
-              <SunMark className="h-9 w-9" />
-              <span className="font-serif text-xl font-semibold">Vivasvana</span>
-            </div>
+            <Image
+              src="/brand/logo.png"
+              alt="Vivasvana — Mindful nourishment made pure"
+              width={60}
+              height={60}
+              className="h-14 w-auto"
+            />
             <p className="mt-3 text-sm text-muted-foreground">
               Plant-based millet superfoods for everyday Indian nutrition.
             </p>
