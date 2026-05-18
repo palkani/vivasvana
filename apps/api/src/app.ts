@@ -22,6 +22,7 @@ import { env } from './config/env.js';
 import healthRoutes from './routes/health.js';
 import productRoutes from './routes/products.js';
 import adminProductRoutes from './routes/admin/products.js';
+import adminReportsRoutes from './routes/admin/reports.js';
 import cartRoutes from './routes/cart.js';
 import addressRoutes from './routes/addresses.js';
 import indiaPostRoutes from './routes/india-post.js';
@@ -90,6 +91,7 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
   await app.register(healthRoutes);
   await app.register(productRoutes);
   await app.register(adminProductRoutes);
+  await app.register(adminReportsRoutes);
   await app.register(cartRoutes);
   await app.register(addressRoutes);
   await app.register(indiaPostRoutes);
