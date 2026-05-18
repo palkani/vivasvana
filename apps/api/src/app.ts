@@ -30,6 +30,7 @@ import discountRoutes from './routes/discounts.js';
 import orderRoutes from './routes/orders.js';
 import paymentRoutes from './routes/payments.js';
 import testimonialRoutes from './routes/testimonials.js';
+import contactRoutes from './routes/contact.js';
 
 export async function buildApp(opts: FastifyServerOptions = {}) {
   const app = Fastify({
@@ -99,6 +100,7 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
   await app.register(orderRoutes);
   await app.register(paymentRoutes);
   await app.register(testimonialRoutes);
+  await app.register(contactRoutes);
   // future: blog…
 
   return app;
