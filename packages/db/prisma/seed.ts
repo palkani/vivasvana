@@ -1,11 +1,11 @@
 /**
- * Seed: 3 SKUs that mirror the live Shopify catalog, a published blog post,
- * testimonials, a welcome discount, and one admin User row.
+ * Seed: real Vivasvana catalog mirrored from the live Shopify site
+ * (https://vivasvana.com) — 3 SKUs with full product copy, prices, and
+ * image paths under /products/* (served from apps/web/public/).
  *
  * Note: this seed does NOT create Supabase auth.users rows — auth users are
  * created via Supabase Studio or the auth API. The admin User row uses a
- * fixed UUID that you should match when creating the auth user manually
- * (see README "Seeding the admin user").
+ * fixed UUID; promote any signed-up user via `pnpm admin:promote <email>`.
  */
 import { PrismaClient, Prisma } from '@prisma/client';
 
@@ -36,80 +36,129 @@ async function main() {
     create: {
       slug: 'millet-foods',
       name: 'Millet Foods',
-      description: 'Plant-based millet superfoods for everyday nutrition.',
+      description: 'Plant-based millet superfoods for everyday Indian nutrition.',
     },
   });
 
-  // --- Products (mirrors live Shopify SKUs) ---
-  const products: Array<{
+  // --- Products: real catalog from vivasvana.com ---
+  interface ProductSeed {
     slug: string;
     title: string;
     sku: string;
     price: Prisma.Decimal | string;
-    description: string;
+    salePrice?: string;
     shortDescription: string;
+    description: string;
     ingredients: string;
     howToUse: string;
+    allergens: string;
     weight: number;
     stock: number;
+    nutritionFacts: Prisma.JsonObject;
     images: string[];
-  }> = [
+  }
+
+  const products: ProductSeed[] = [
     {
       slug: 'nutri-millet',
-      title: 'Nutri Millet',
+      title:
+        'Vivasvana Nutri Millet | Iron-Rich High Fibre Millet Mix | Plant-Based Daily Nutrition for Gut Health, Digestion & Energy | 500g',
       sku: 'VV-NUTRI-MILLET-500G',
-      price: '299.00',
-      description:
-        'Nutri Millet is a wholesome, plant-based superfood blend of finger millet (ragi), foxtail, kodo, and little millet with almonds, cashews, and natural jaggery. Powered with iron, calcium, and dietary fiber. Perfect for kids, adults, and seniors looking for energy without crashes.',
+      price: '399.00',
+      salePrice: '299.00',
       shortDescription:
-        'Wholesome plant-based superfood blend of 7 millets, nuts, and jaggery.',
+        'Iron-rich, high-fibre millet mix for daily gut health, digestion and sustained plant-based energy. Made from 6+ ancient Indian millets.',
+      description: `Vivasvana Nutri Millet is a daily-nutrition blend crafted from six ancient Indian millets — finger millet (ragi), foxtail, kodo, little, barnyard and pearl — combined with almonds, cashews and natural jaggery. Designed for the whole family: powered with iron, calcium and dietary fibre to support gut health, digestion and steady energy without the crashes of refined cereals.\n\nMade in India. FSSAI certified. 100% plant-based. No refined sugar. No preservatives. No artificial colours or flavours.`,
       ingredients:
-        'Finger millet (ragi), foxtail millet, kodo millet, little millet, almonds, cashews, jaggery, cardamom.',
+        'Finger millet (ragi), foxtail millet, kodo millet, little millet, barnyard millet, pearl millet, almonds, cashews, jaggery, cardamom. Processed in a facility that also handles tree nuts, soy and wheat.',
       howToUse:
-        'Mix 2-3 tbsp with hot milk or water. Stir until smooth. Sweetness can be adjusted. Great as a breakfast porridge or evening snack.',
+        'Mix 2-3 tablespoons (50g) with hot milk (dairy or plant) or water. Stir until smooth. Adjust sweetness with extra jaggery or honey. Best as a breakfast porridge or evening snack. Can also be added to smoothie bowls, oats or kheer.',
+      allergens: 'Contains nuts (almonds, cashews). May contain traces of soy, wheat and other tree nuts.',
       weight: 500,
       stock: 120,
+      nutritionFacts: {
+        servingSize: '50g',
+        energyKcal: 208,
+        proteinG: 8.2,
+        carbsG: 35.1,
+        fiberG: 5.1,
+        fatG: 3.4,
+        ironMg: 4.6,
+        calciumMg: 86,
+      },
       images: [
-        'https://placehold.co/800x800/bf8b3a/ffffff/png?text=Nutri+Millet+1',
-        'https://placehold.co/800x800/a26e2f/ffffff/png?text=Nutri+Millet+2',
-        'https://placehold.co/800x800/82532a/ffffff/png?text=Nutri+Millet+3',
+        '/products/nutri-millet/front.png',
+        '/products/nutri-millet/back.png',
+        '/products/nutri-millet/how-to-prepare.png',
+        '/products/nutri-millet/benefits.png',
+        '/products/nutri-millet/lifestyle-1.jpg',
+        '/products/nutri-millet/lifestyle-2.jpg',
       ],
     },
     {
       slug: 'millet-mojo',
-      title: 'Millet Mojo',
+      title:
+        'Vivasvana Millet Mojo | High Protein Plant-Based Meal Replacement | Ancient Millet Superfood for Strength, Energy & Recovery | 500g',
       sku: 'VV-MILLET-MOJO-500G',
-      price: '299.00',
-      description:
-        'Millet Mojo is an active-lifestyle blend with sprouted millets, dates, and natural cocoa. High in plant protein and slow-release carbs — ideal pre- and post-workout fuel for fitness-conscious millennials.',
-      shortDescription: 'High-protein millet blend with sprouted grains, dates, and cocoa.',
+      price: '399.00',
+      salePrice: '299.00',
+      shortDescription:
+        'High-protein, plant-based meal replacement powder. 10.15g protein per 50g serving. Built for strength, muscle recovery and sustained energy — naturally.',
+      description: `Vivasvana Millet Mojo is a complete plant-based meal replacement made from 6+ ancient Indian millets, plant proteins, nuts, pulses and digestive herbs (cumin, ajwain, fenugreek, kalonji). Each 50g serving delivers 10.15g of plant protein, 5.13g of dietary fibre and 208.87 kcal of clean, slow-release fuel — engineered for active-lifestyle Indians who want strength without dairy or whey.\n\nMade in India. FSSAI certified. 100% vegan. Lactose-free. No refined sugar, no preservatives, no artificial sweeteners.`,
       ingredients:
-        'Sprouted finger millet, sprouted foxtail millet, sprouted little millet, dates, cocoa, almonds, sunflower seeds, pumpkin seeds.',
+        'Sprouted finger millet, sprouted foxtail millet, sprouted little millet, kodo millet, barnyard millet, pearl millet, plant protein blend (soy, pea), almonds, cashews, sunflower seeds, pumpkin seeds, dates, cocoa, cumin, ajwain, fenugreek, kalonji.',
       howToUse:
-        'Blend 2 tbsp with cold milk (dairy or plant) for a shake, or stir into oats. Pairs well with banana and peanut butter.',
+        'Blend 2 tablespoons (50g) with 250ml warm water, dairy or plant milk for a smooth shake. Pair with banana, peanut butter or oats for a complete meal. Best within 30 minutes post-workout or as a high-protein breakfast.',
+      allergens:
+        'Contains Soy, Peanut, Sesame, Coconut. Processed in a facility that also handles tree nuts and wheat (gluten). Not suitable for severe gluten intolerance or celiac disease.',
       weight: 500,
       stock: 90,
+      nutritionFacts: {
+        servingSize: '50g',
+        energyKcal: 208.87,
+        proteinG: 10.15,
+        carbsG: 32.4,
+        fiberG: 5.13,
+        fatG: 3.9,
+        ironMg: 5.2,
+        calciumMg: 92,
+      },
       images: [
-        'https://placehold.co/800x800/4a7c30/ffffff/png?text=Millet+Mojo+1',
-        'https://placehold.co/800x800/3b6326/ffffff/png?text=Millet+Mojo+2',
-        'https://placehold.co/800x800/82532a/ffffff/png?text=Millet+Mojo+3',
+        '/products/millet-mojo/front.png',
+        '/products/millet-mojo/back.png',
+        '/products/millet-mojo/nutrition-facts.png',
+        '/products/millet-mojo/lifestyle-1.jpg',
+        '/products/millet-mojo/lifestyle-2.jpg',
       ],
     },
     {
       slug: 'combo-pack',
-      title: 'Combo Pack — Nutri Millet + Millet Mojo',
+      title:
+        'Vivasvana Combo Pack | Nutri Millet + Millet Mojo | Complete Plant-Based Nutrition Bundle | Gut Health + Protein + Energy | 500g x 2',
       sku: 'VV-COMBO-PACK',
-      price: '549.00',
-      description:
-        'Get both our flagship blends together and save ₹49. Nutri Millet for everyday family nutrition + Millet Mojo for active lifestyle. Perfect gift pack or a way to try both blends.',
-      shortDescription: 'Both 500g blends together — save ₹49.',
-      ingredients: 'See individual product listings.',
-      howToUse: 'See individual product listings.',
+      price: '798.00',
+      salePrice: '549.00',
+      shortDescription:
+        'Both 500g blends together — save ₹249. Nutri Millet for everyday family nutrition + Millet Mojo for active-lifestyle protein.',
+      description: `Get our two flagship blends together and save ₹249. Vivasvana Nutri Millet powers the family's daily gut-health and energy routine, while Millet Mojo fuels muscle recovery and strength for the active members. One bundle, one month of clean plant-based nutrition for the whole household.\n\nMade in India. FSSAI certified. 100% plant-based. No refined sugar. No preservatives.`,
+      ingredients: 'See individual Nutri Millet and Millet Mojo product listings for full ingredient details.',
+      howToUse: 'See individual product listings. Both can be mixed with water, milk or plant milk and used as porridge, shake or smoothie.',
+      allergens:
+        'Contains nuts (almonds, cashews), soy, peanut, sesame, coconut. Processed in a facility that also handles tree nuts and wheat (gluten).',
       weight: 1000,
       stock: 60,
+      nutritionFacts: {
+        servingSize: '50g (per pack)',
+        energyKcal: '208–209',
+        proteinG: '8.2–10.15',
+        carbsG: '32.4–35.1',
+        fiberG: '5.1–5.13',
+        fatG: '3.4–3.9',
+      },
       images: [
-        'https://placehold.co/800x800/cfa552/ffffff/png?text=Combo+Pack+1',
-        'https://placehold.co/800x800/dcbd76/ffffff/png?text=Combo+Pack+2',
+        '/products/combo-pack/cover.png',
+        '/products/combo-pack/millet-mojo-front.png',
+        '/products/combo-pack/nutri-millet-front.png',
       ],
     },
   ];
@@ -119,48 +168,50 @@ async function main() {
       where: { slug: p.slug },
       update: {
         title: p.title,
+        sku: p.sku,
         price: p.price,
-        description: p.description,
+        salePrice: p.salePrice,
         shortDescription: p.shortDescription,
+        description: p.description,
         ingredients: p.ingredients,
         howToUse: p.howToUse,
+        allergens: p.allergens,
         weight: p.weight,
         stock: p.stock,
         status: 'PUBLISHED',
+        nutritionFacts: p.nutritionFacts,
+        isVegan: true,
+        metaTitle: p.title.split('|')[0]?.trim(),
+        metaDescription: p.shortDescription,
       },
       create: {
         slug: p.slug,
         title: p.title,
         sku: p.sku,
         price: p.price,
+        salePrice: p.salePrice,
         description: p.description,
         shortDescription: p.shortDescription,
         ingredients: p.ingredients,
         howToUse: p.howToUse,
+        allergens: p.allergens,
         weight: p.weight,
         stock: p.stock,
         status: 'PUBLISHED',
-        metaTitle: `${p.title} — Vivasvana`,
+        metaTitle: p.title.split('|')[0]?.trim(),
         metaDescription: p.shortDescription,
         isVegan: true,
-        nutritionFacts: {
-          servingSize: '30g',
-          energyKcal: 110,
-          proteinG: 4,
-          carbsG: 18,
-          fiberG: 3,
-          fatG: 2,
-        },
+        nutritionFacts: p.nutritionFacts,
       },
     });
 
-    // Replace images deterministically
+    // Replace images deterministically so re-running the seed picks up new files
     await prisma.productImage.deleteMany({ where: { productId: product.id } });
     await prisma.productImage.createMany({
       data: p.images.map((url, i) => ({
         productId: product.id,
         url,
-        altText: `${p.title} image ${i + 1}`,
+        altText: `${p.title.split('|')[0]?.trim() ?? p.slug} ${i + 1}`,
         sortOrder: i,
       })),
     });
@@ -172,36 +223,37 @@ async function main() {
     });
   }
 
-  // --- Testimonials --- (idempotent via fixed UUIDs)
+  // --- Testimonials (real ones from the live site) ---
   const testimonials = [
     {
       id: '00000000-0000-0000-0000-00000000aa01',
-      name: 'Priya Ramanathan',
-      location: 'Chennai, TN',
+      name: 'Priya S.',
+      location: 'Mumbai',
       content:
-        'My kids love the Nutri Millet shake every morning. Finally a healthy option they actually ask for!',
+        'Millet Mojo has completely transformed my morning routine. I feel stronger and more energetic throughout the day!',
       rating: 5,
     },
     {
       id: '00000000-0000-0000-0000-00000000aa02',
-      name: 'Arjun Mehta',
-      location: 'Bengaluru, KA',
+      name: 'Rahul M.',
+      location: 'Bangalore',
       content:
-        'Millet Mojo is now my pre-gym fuel. Clean energy without the crash from sugary protein shakes.',
+        "Finally a clean protein that doesn't upset my stomach. Nutri Millet is now a daily staple for my whole family.",
       rating: 5,
     },
     {
       id: '00000000-0000-0000-0000-00000000aa03',
-      name: 'Lakshmi Iyer',
-      location: 'Coimbatore, TN',
-      content: 'Authentic taste, great packaging, fast delivery. The combo pack is the best value.',
+      name: 'Ananya K.',
+      location: 'Delhi',
+      content:
+        "Love that it's 100% plant-based and made from ancient grains. You can taste the quality difference!",
       rating: 5,
     },
   ];
   for (const t of testimonials) {
     await prisma.testimonial.upsert({
       where: { id: t.id },
-      update: { content: t.content, rating: t.rating },
+      update: { content: t.content, rating: t.rating, name: t.name, location: t.location },
       create: t,
     });
   }

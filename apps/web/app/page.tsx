@@ -1,5 +1,11 @@
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
+import {
+  Sparkles,
+  Sun,
+  Leaf,
+  ShieldCheck,
+  MapPin,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { HeroBanner } from '@/components/storefront/HeroBanner';
 import { ProductCard } from '@/components/storefront/ProductCard';
@@ -33,6 +39,33 @@ async function getTestimonials(): Promise<Testimonial[]> {
   }
 }
 
+const PILLARS = [
+  {
+    icon: Sun,
+    title: 'Ancient Wisdom',
+    body:
+      'Crafted from 6+ ancient Indian millets used for thousands of years in traditional Indian nutrition.',
+  },
+  {
+    icon: Leaf,
+    title: 'Clean Label Promise',
+    body:
+      'Zero artificial colours, flavours, preservatives or added sugar. Always real, never artificial.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'FSSAI Certified',
+    body:
+      "Licensed by FSSAI under India's highest food safety standards. Lab-tested for quality every batch.",
+  },
+  {
+    icon: MapPin,
+    title: 'Proudly Made in India',
+    body:
+      'Farmer-rooted ingredients, recyclable packaging, and a commitment to sustainable Indian agriculture.',
+  },
+];
+
 export default async function HomePage() {
   const [products, testimonials] = await Promise.all([getFeaturedProducts(), getTestimonials()]);
 
@@ -50,7 +83,7 @@ export default async function HomePage() {
       <HeroBanner productImages={heroImages} />
 
       {/* Featured products */}
-      <section className="container py-20">
+      <section className="container py-16 md:py-20">
         <header className="mx-auto max-w-2xl text-center">
           <p className="inline-flex items-center gap-2 rounded-full bg-brand-100 px-3 py-1 text-xs font-medium uppercase tracking-wider text-brand-800">
             <Sparkles className="h-3.5 w-3.5" aria-hidden /> Hand-crafted in India
@@ -66,7 +99,7 @@ export default async function HomePage() {
         <div className="mx-auto mt-10 grid max-w-5xl gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {products.length === 0 ? (
             <p className="col-span-full rounded-lg border bg-muted/40 p-8 text-center text-sm text-muted-foreground">
-              Products will appear here once the API is reachable and the database is seeded.
+              Products will appear here once the database is seeded.{' '}
               Run <code className="rounded bg-background px-1.5 py-0.5 font-mono">pnpm db:seed</code>.
             </p>
           ) : (
@@ -81,45 +114,44 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Brand story */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-leaf-500/10 via-background to-brand-100/30">
-        <div className="container grid items-center gap-12 py-20 md:grid-cols-2">
+      {/* Brand story — mirrors vivasvana.com "About Vivasvana" section */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-leaf-500/10 via-background to-brand-100/40">
+        <div className="container grid items-start gap-12 py-16 md:py-20 lg:grid-cols-2">
           <div className="space-y-5">
             <p className="text-xs font-medium uppercase tracking-[0.22em] text-brand-600">
-              Our story
+              About Vivasvana
             </p>
-            <h2 className="font-serif text-3xl font-semibold tracking-tight text-brand-900 md:text-4xl">
-              Rooted in tradition,<br />made for today
+            <h2 className="font-serif text-3xl font-semibold leading-tight tracking-tight text-brand-900 md:text-4xl">
+              Born of sunlight,<br />built for daily strength
             </h2>
+            <p className="text-sm font-medium text-brand-700">Mindful Nourishment Made Pure</p>
             <p className="text-foreground/80">
-              Vivasvana means <em>the radiant one</em> — the Sanskrit name for the sun, source of all
-              nourishment. We honor that legacy by sourcing millets directly from Indian farmers,
-              blending them with traditional ingredients, and delivering them in clean,
-              minimally-processed packs.
+              Vivasvana draws its name from the ancient Sanskrit word for the Sun — a symbol of
+              energy, vitality and life. Inspired by India&rsquo;s rich tradition of plant-based
+              nutrition and guided by the <em>Sapta Dhatu</em> philosophy of nourishing all seven
+              vital tissues, we craft every product to fuel your body from the inside out.
             </p>
             <p className="text-foreground/80">
-              No refined sugar. No preservatives. Just ancient grains, ready for modern kitchens.
+              True nutrition comes from the earth — from farmer-rooted, minimally processed ancient
+              Indian superfoods like millets, pulses, nuts and digestive herbs. Clean-label,
+              preservative-free, 100% vegan.
             </p>
-            <Button asChild>
-              <Link href="/about">Read our full story</Link>
-            </Button>
+            <p className="pt-2 font-serif text-lg italic text-brand-600">
+              Nourishing India, one ancient grain at a time.
+            </p>
           </div>
 
-          <ul className="grid grid-cols-2 gap-4">
-            {[
-              { stat: '7', label: 'Ancient millets in every pack' },
-              { stat: '0g', label: 'Refined sugar added' },
-              { stat: '5★', label: 'Average customer rating' },
-              { stat: '1000+', label: 'Indian families served' },
-            ].map((m) => (
+          <ul className="grid gap-4 sm:grid-cols-2">
+            {PILLARS.map(({ icon: Icon, title, body }) => (
               <li
-                key={m.label}
-                className="rounded-2xl border border-brand-100 bg-card p-6 text-center shadow-sm"
+                key={title}
+                className="rounded-2xl border border-brand-100 bg-card p-5 shadow-sm transition hover:shadow-md"
               >
-                <p className="font-serif text-4xl font-semibold text-brand-700">{m.stat}</p>
-                <p className="mt-2 text-xs uppercase tracking-wider text-muted-foreground">
-                  {m.label}
-                </p>
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+                  <Icon className="h-5 w-5" aria-hidden />
+                </span>
+                <h3 className="mt-4 font-serif text-base font-semibold text-brand-900">{title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
               </li>
             ))}
           </ul>
