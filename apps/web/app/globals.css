@@ -54,4 +54,34 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Horizontal infinite marquee.
+   * Requirements for a seamless loop:
+   *   1. The animated track contains the items list TWICE
+   *   2. Track width is intrinsic (w-max) so the children dictate size
+   *   3. Animation translates from 0 → -50% (one full copy) over its duration
+   * Result: when the first copy ends, the second copy is in the same visual
+   * position as the first started — looks like an endless conveyor.
+   */
+  @keyframes marquee-x {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .animate-marquee {
+    animation: marquee-x var(--marquee-duration, 30s) linear infinite;
+    animation-play-state: running;
+    will-change: transform;
+  }
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-marquee {
+      animation: none;
+    }
+  }
 }
