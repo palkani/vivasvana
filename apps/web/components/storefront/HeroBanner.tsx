@@ -1,88 +1,61 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { Leaf, Wheat, ShieldCheck, Heart, Sprout, Sparkles } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-
-const features = [
-  { icon: Leaf, label: '100% Plant-Based' },
-  { icon: Sprout, label: 'No Added Sugar' },
-  { icon: ShieldCheck, label: 'No Preservatives' },
-  { icon: Heart, label: 'Clean & Natural' },
-  { icon: Wheat, label: '6+ Ancient Millets' },
-];
 
 interface Props {
-  /** Optional product packshots — kept in the signature so the homepage
-   *  doesn't need to change when we swap art back to a layered hero. */
+  /** Kept for API compatibility with the homepage; unused now that the
+   *  hero is a single composed image. */
   productImages?: Array<{ url: string; alt: string; slug: string }>;
 }
 
 /**
- * Hero uses the actual Vivasvana banner art at /brand/hero-banner.png
- * so the homepage looks production-ready. Copy lives in a left column on
- * desktop; the banner image stacks above the text on mobile.
+ * Full-bleed hero mirroring vivasvana.com — the banner image IS the hero,
+ * edge-to-edge. Headline, packshots, feature icons and CTAs are all baked
+ * into the artwork itself, so no extra HTML copy on top of it.
+ *
+ * Two invisible click overlays sit over the baked-in "SHOP NOW" /
+ * "EXPLORE PRODUCTS" buttons in the artwork so the visual CTAs are
+ * actually navigable. The overlays are transparent and only show a
+ * focus ring for keyboard users.
  */
 export function HeroBanner(_props: Props) {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-brand-50 via-background to-brand-100/40">
-      <Leaf
-        className="pointer-events-none absolute -left-10 top-8 h-32 w-32 rotate-[-20deg] text-leaf-500/10"
-        aria-hidden
-      />
-      <Leaf
-        className="pointer-events-none absolute -right-8 bottom-12 h-40 w-40 rotate-[35deg] text-leaf-500/10"
-        aria-hidden
-      />
+    <section
+      className="relative w-full overflow-hidden bg-brand-50"
+      aria-label="Vivasvana — Fuel your day the natural way"
+    >
+      {/* The hero text is baked into the image; expose a real h1 to
+          screen readers + search engines via sr-only. */}
+      <h1 className="sr-only">
+        Vivasvana — Fuel your day the natural way with plant-based millet superfoods
+      </h1>
 
-      <div className="container relative grid items-center gap-10 py-10 md:gap-12 md:py-16 lg:grid-cols-2 lg:py-20">
-        <div className="order-2 space-y-6 lg:order-1">
-          <p className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium tracking-wide text-brand-800">
-            <Sparkles className="h-3.5 w-3.5" aria-hidden /> FSSAI Certified · Plant-Based · Made in India
-          </p>
+      {/* Native banner aspect ratio (1717:916 ≈ 1.875). max-height keeps
+          ultra-wide displays from giving us an absurdly tall hero. */}
+      <div className="relative w-full" style={{ aspectRatio: '1717 / 916', maxHeight: '85vh' }}>
+        <Image
+          src="/brand/hero-banner.png"
+          alt="Vivasvana — Fuel your day the natural way with Nutri Millet and Millet Mojo plant-based millet superfoods"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center"
+        />
 
-          <h1 className="font-serif text-4xl font-bold uppercase leading-[0.95] tracking-tight text-brand-900 md:text-5xl lg:text-6xl">
-            Fuel your day
-            <br />
-            <span className="text-brand-600">the natural way</span>
-          </h1>
-
-          <p className="max-w-prose text-lg text-foreground/80">
-            Powerful nutrition from <span className="font-medium">6+ ancient Indian millets</span> —
-            ragi, foxtail, kodo, little, barnyard, pearl — blended with almonds, dates and digestive
-            herbs. A stronger, healthier you starts with what&rsquo;s on your spoon.
-          </p>
-
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" className="px-7">
-              <Link href="/products">Shop the range</Link>
-            </Button>
-            <Button asChild variant="outline" size="lg" className="border-brand-300 px-7">
-              <Link href="/about">Our story</Link>
-            </Button>
-          </div>
-
-          <ul className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-2 text-xs font-medium text-foreground/70">
-            {features.map(({ icon: Icon, label }) => (
-              <li key={label} className="flex items-center gap-1.5">
-                <Icon className="h-3.5 w-3.5 text-leaf-600" aria-hidden />
-                {label}
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="order-1 lg:order-2">
-          <div className="relative mx-auto aspect-[16/10] w-full max-w-2xl overflow-hidden rounded-2xl shadow-xl ring-1 ring-brand-100">
-            <Image
-              src="/brand/hero-banner.png"
-              alt="Vivasvana — Nutri Millet and Millet Mojo plant-based millet superfoods"
-              fill
-              priority
-              sizes="(min-width: 1024px) 600px, 100vw"
-              className="object-cover"
-            />
-          </div>
-        </div>
+        {/* Click overlays positioned over the artwork's baked-in CTAs.
+            Values are percentages of the 1717×916 source — re-tune if the
+            banner art changes. */}
+        <Link
+          href="/products"
+          aria-label="Shop now"
+          className="absolute rounded-md outline-none ring-offset-2 transition focus-visible:ring-2 focus-visible:ring-brand-500"
+          style={{ left: '36.5%', top: '78%', width: '11%', height: '8.5%' }}
+        />
+        <Link
+          href="/products"
+          aria-label="Explore products"
+          className="absolute rounded-md outline-none ring-offset-2 transition focus-visible:ring-2 focus-visible:ring-brand-500"
+          style={{ left: '50%', top: '78%', width: '14%', height: '8.5%' }}
+        />
       </div>
     </section>
   );
