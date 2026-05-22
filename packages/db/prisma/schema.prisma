@@ -20,15 +20,19 @@ datasource db {
 // =============================================================================
 
 model User {
-  id        String   @id @db.Uuid
-  email     String   @unique
-  phone     String?
-  name      String?
-  role      UserRole @default(CUSTOMER)
-  gstin     String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  id          String     @id @db.Uuid
+  email       String     @unique
+  phone       String?
+  name        String?
+  role        UserRole   @default(CUSTOMER)
+  staffRole   StaffRole? @map("staff_role")
+  invitedById String?    @map("invited_by_id") @db.Uuid
+  invitedAt   DateTime?  @map("invited_at")
+  lastSeenAt  DateTime?  @map("last_seen_at")
+  gstin       String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at")
 
   addresses     Address[]
   carts         Cart[]
@@ -36,9 +40,12 @@ model User {
   wishlists     Wishlist[]
   reviews       Review[]
   contactMsgs   ContactMessage[] @relation("ContactAuthor")
+  invitedBy     User?            @relation("StaffInvites", fields: [invitedById], references: [id])
+  invitees      User[]           @relation("StaffInvites")
 
   @@index([email])
   @@index([phone])
+  @@index([role])
   @@map("users")
 }
 
@@ -46,6 +53,16 @@ enum UserRole {
   CUSTOMER
   STAFF
   ADMIN
+}
+
+/// Granular staff permission preset. Only meaningful when User.role = STAFF.
+/// ADMIN bypasses these and has all permissions implicitly.
+enum StaffRole {
+  MANAGER          // everything except settings + staff management
+  ORDER_MANAGER    // orders + customer view + discount view
+  SUPPORT          // view orders + customers; cannot mutate
+  CONTENT_EDITOR   // blog + product content (no inventory or pricing)
+  INVENTORY        // products + stock only
 }
 
 model Address {
@@ -501,6 +518,17 @@ enum ContentStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+// Singleton row: storefront settings the admin can edit (store info,
+// shipping defaults, COD config, contact email, social links). Stored as
+// JSON so we don't need a migration every time we add a knob.
+model SiteSetting {
+  id        String   @id
+  data      Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
 }
 
 model Testimonial {

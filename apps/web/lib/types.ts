@@ -194,9 +194,21 @@ export interface Order {
   notes: string | null;
   placedAt: string;
   confirmedAt: string | null;
+  packedAt: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
   cancelledAt: string | null;
   items: OrderItem[];
   shippingAddress: OrderShipping | null;
+}
+
+export interface Payment {
+  id: string;
+  orderId: string;
+  gateway: string;
+  amount: string;
+  currency: string;
+  status: PaymentStatus;
+  failureReason: string | null;
+  createdAt: string;
 }

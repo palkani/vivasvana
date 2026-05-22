@@ -50,8 +50,9 @@ const AdminListQuery = z.object({
 export default async function adminProductRoutes(app: FastifyInstance) {
   const service = new ProductService(app.prisma);
 
+  // Read scope: SUPPORT / CONTENT_EDITOR / INVENTORY / MANAGER + ADMIN.
   app.register(async (admin) => {
-    admin.addHook('preHandler', admin.requireAdmin);
+    admin.addHook('preHandler', admin.requirePermission('view_products'));
 
     admin.get(
       '/api/admin/products',
@@ -88,6 +89,12 @@ export default async function adminProductRoutes(app: FastifyInstance) {
         return serializeMoney(product);
       },
     );
+
+  });
+
+  // Write scope: INVENTORY / MANAGER + ADMIN.
+  app.register(async (admin) => {
+    admin.addHook('preHandler', admin.requirePermission('manage_products'));
 
     admin.post(
       '/api/admin/products',

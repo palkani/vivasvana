@@ -29,16 +29,22 @@ export function HeroBanner(_props: Props) {
         Vivasvana — Fuel your day the natural way with plant-based millet superfoods
       </h1>
 
-      {/* Native banner aspect ratio (1717:916 ≈ 1.875). max-height keeps
-          ultra-wide displays from giving us an absurdly tall hero. */}
-      <div className="relative w-full" style={{ aspectRatio: '1717 / 916', maxHeight: '85vh' }}>
+      {/* Native banner aspect ratio (1717:916 ≈ 1.875). On ultra-wide
+          displays we cap the width (not height) so the whole composition
+          stays visible — the previous `maxHeight: 85vh` forced the
+          container into a wider-than-image aspect, which made object-cover
+          crop the top + bottom (including the baked-in CTAs). */}
+      <div
+        className="relative mx-auto w-full"
+        style={{ aspectRatio: '1717 / 916', maxWidth: '1920px' }}
+      >
         <Image
           src="/brand/hero-banner.png"
           alt="Vivasvana — Fuel your day the natural way with Nutri Millet and Millet Mojo plant-based millet superfoods"
           fill
           priority
-          sizes="100vw"
-          className="object-cover object-center"
+          sizes="(min-width: 1920px) 1920px, 100vw"
+          className="object-contain object-center"
         />
 
         {/* Click overlays positioned over the artwork's baked-in CTAs.

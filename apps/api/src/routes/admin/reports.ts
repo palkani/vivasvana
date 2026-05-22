@@ -10,7 +10,7 @@ export default async function adminReportsRoutes(app: FastifyInstance) {
   const service = new ReportsService(app.prisma);
 
   app.register(async (admin) => {
-    admin.addHook('preHandler', admin.requireAdmin);
+    admin.addHook('preHandler', admin.requirePermission('view_reports'));
 
     admin.get(
       '/api/admin/reports/summary',

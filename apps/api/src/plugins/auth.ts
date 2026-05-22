@@ -1,8 +1,16 @@
 import fp from 'fastify-plugin';
 import { jwtVerify } from 'jose';
 import type { FastifyReply, FastifyRequest } from 'fastify';
+import type { StaffRole, UserRole } from '@vivasvana/db';
 import { env } from '../config/env.js';
 import { NotificationService } from '../services/notification.service.js';
+import {
+  ALL_PERMISSIONS,
+  permissionsFor,
+  hasAnyAdminPermission,
+  hasPermission,
+  type Permission,
+} from '../lib/permissions.js';
 
 /**
  * Auth model:
@@ -10,18 +18,19 @@ import { NotificationService } from '../services/notification.service.js';
  *   - Browser sends it as `Authorization: Bearer <token>`.
  *   - We verify it and load the mirror User row (role lives there, not in JWT claims).
  *
- * Two helpers are decorated on `app`:
- *   - app.authenticate     — requires a logged-in user; populates request.user
- *   - app.requireAdmin     — requires authenticate + role === 'ADMIN' or 'STAFF'
- *
- * On routes that need them, set as `preHandler`:
- *   app.get('/me', { preHandler: app.authenticate }, handler)
+ * Helpers decorated on `app`:
+ *   - app.authenticate         — requires a logged-in user; populates request.user
+ *   - app.requireAdmin         — strict admin-only (delegates to requirePermission('manage_staff'))
+ *   - app.requirePermission(p) — preHandler factory; requires staff/admin with the given permission
+ *   - app.optionalAuth         — populates request.user if a valid token is present
  */
 
 export interface AuthUser {
   id: string;
   email: string;
-  role: 'CUSTOMER' | 'STAFF' | 'ADMIN';
+  role: UserRole;
+  staffRole: StaffRole | null;
+  permissions: ReadonlyArray<Permission>;
 }
 
 declare module 'fastify' {
@@ -31,6 +40,9 @@ declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
     requireAdmin: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requirePermission: (
+      perm: Permission,
+    ) => (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
     optionalAuth: (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
 }
@@ -74,20 +86,37 @@ export default fp(
     const loadUser = async (claims: { sub: string; email: string }): Promise<AuthUser | null> => {
       const existing = await app.prisma.user.findUnique({
         where: { id: claims.sub },
-        select: { id: true, email: true, role: true, deletedAt: true },
+        select: { id: true, email: true, role: true, staffRole: true, deletedAt: true },
       });
       if (existing) {
         if (existing.deletedAt) return null;
-        return { id: existing.id, email: existing.email, role: existing.role };
+        const resolved = permissionsFor(existing.role, existing.staffRole);
+        // Best-effort lastSeenAt update — fire-and-forget so it doesn't block.
+        void app.prisma.user
+          .update({ where: { id: existing.id }, data: { lastSeenAt: new Date() } })
+          .catch(() => {});
+        return {
+          id: existing.id,
+          email: existing.email,
+          role: existing.role,
+          staffRole: existing.staffRole,
+          permissions: resolved.permissions,
+        };
       }
       // First seen — mirror Supabase identity into our domain user table
       // and fire the welcome email asynchronously.
       const created = await app.prisma.user.create({
         data: { id: claims.sub, email: claims.email || `${claims.sub}@user.local`, role: 'CUSTOMER' },
-        select: { id: true, email: true, role: true },
+        select: { id: true, email: true, role: true, staffRole: true },
       });
       void notifications.sendWelcome({ email: created.email });
-      return created;
+      return {
+        id: created.id,
+        email: created.email,
+        role: created.role,
+        staffRole: created.staffRole,
+        permissions: [],
+      };
     };
 
     app.decorate('authenticate', async (req: FastifyRequest, reply: FastifyReply) => {
@@ -109,25 +138,44 @@ export default fp(
       if (user) req.user = user;
     });
 
-    app.decorate('requireAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
-      // Dev-only bypass: when ADMIN_AUTH_DISABLED is set AND we are NOT in
-      // production, treat every request as a logged-in stub admin. The
-      // NODE_ENV gate is intentional — even if the flag is mistakenly set
-      // in prod env vars, prod refuses to honor it.
+    const applyDevBypass = (req: FastifyRequest): boolean => {
       if (env.NODE_ENV !== 'production' && env.ADMIN_AUTH_DISABLED) {
         req.user = {
           id: '00000000-0000-0000-0000-000000000001',
           email: 'dev@local',
           role: 'ADMIN',
+          staffRole: null,
+          permissions: ALL_PERMISSIONS,
         };
         app.log.warn('admin auth bypassed (ADMIN_AUTH_DISABLED=true, dev only)');
-        return;
+        return true;
       }
+      return false;
+    };
+
+    app.decorate('requireAdmin', async (req: FastifyRequest, reply: FastifyReply) => {
+      // Reserved for endpoints that must remain ADMIN-only (settings, staff
+      // management). STAFF roles cannot reach these even with permissions.
+      if (applyDevBypass(req)) return;
       await app.authenticate(req, reply);
       if (reply.sent) return;
-      if (!req.user || (req.user.role !== 'ADMIN' && req.user.role !== 'STAFF')) {
+      if (!req.user || req.user.role !== 'ADMIN') {
         return reply.forbidden('admin access required');
       }
+    });
+
+    app.decorate('requirePermission', (perm: Permission) => {
+      return async (req: FastifyRequest, reply: FastifyReply) => {
+        if (applyDevBypass(req)) return;
+        await app.authenticate(req, reply);
+        if (reply.sent) return;
+        if (!req.user || !hasAnyAdminPermission(req.user.permissions)) {
+          return reply.forbidden('admin access required');
+        }
+        if (!hasPermission(req.user.permissions, perm)) {
+          return reply.forbidden(`missing permission: ${perm}`);
+        }
+      };
     });
   },
   { name: 'auth', dependencies: ['prisma'] },

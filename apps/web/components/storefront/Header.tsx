@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { ShoppingBag, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SunMark } from './SunMark';
 
 const nav = [
   { href: '/', label: 'Home' },
@@ -13,19 +13,26 @@ const nav = [
 export function Header() {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-brand-100 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="container flex h-20 items-center justify-between gap-6">
-        {/* The brand logo PNG already contains the sun mark, "Vivasvana"
-            wordmark, and "Mindful nourishment made pure" tagline — so
-            this single image IS the lockup, no separate HTML text. */}
-        <Link href="/" className="flex items-center" aria-label="Vivasvana — home">
-          <Image
-            src="/brand/logo.png"
-            alt="Vivasvana — Mindful nourishment made pure"
-            width={60}
-            height={60}
-            priority
-            className="h-14 w-auto md:h-16"
-          />
+      <div className="container flex h-24 items-center justify-between gap-6 md:h-28">
+        {/* Hybrid lockup: SVG sun mark (always crisp) + Playfair "Vivasvana"
+            wordmark + tagline. The brand PNG is only 60×60, so at desktop
+            sizes it pixelated and got visually drowned out by the bold
+            green trust strip below. This HTML/SVG version stays sharp at
+            any size and gives the wordmark proper weight. */}
+        <Link
+          href="/"
+          aria-label="Vivasvana — Mindful nourishment made pure"
+          className="flex items-center gap-3 leading-none"
+        >
+          <SunMark className="h-12 w-12 shrink-0 md:h-14 md:w-14" />
+          <span className="flex flex-col">
+            <span className="font-serif text-2xl font-semibold tracking-tight text-brand-700 md:text-3xl">
+              Vivasvana
+            </span>
+            <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground md:text-xs">
+              Mindful nourishment made pure
+            </span>
+          </span>
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">

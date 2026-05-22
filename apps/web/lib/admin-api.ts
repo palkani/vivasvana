@@ -23,6 +23,9 @@ export const adminApi = {
   async put<T>(path: string, body?: unknown) {
     return api.put<T>(path, body, { accessToken: await authHeader() });
   },
+  async patch<T>(path: string, body?: unknown) {
+    return api.patch<T>(path, body, { accessToken: await authHeader() });
+  },
   async del<T>(path: string) {
     return api.del<T>(path, { accessToken: await authHeader() });
   },

@@ -275,4 +275,373 @@ export class OrderService {
       });
     });
   }
+
+  // ===========================================================================
+  // ADMIN OPERATIONS
+  // ===========================================================================
+
+  async adminList(args: {
+    page?: number;
+    pageSize?: number;
+    status?: import('@vivasvana/db').OrderStatus;
+    paymentStatus?: import('@vivasvana/db').PaymentStatus;
+    paymentMethod?: import('@vivasvana/db').PaymentMethod;
+    search?: string;
+    placedFrom?: Date;
+    placedTo?: Date;
+    sort?: 'placedAt-desc' | 'placedAt-asc' | 'total-desc' | 'total-asc';
+  }) {
+    const page = Math.max(1, args.page ?? 1);
+    const pageSize = Math.min(100, Math.max(1, args.pageSize ?? 20));
+
+    const where: import('@vivasvana/db').Prisma.OrderWhereInput = {};
+    if (args.status) where.status = args.status;
+    if (args.paymentStatus) where.paymentStatus = args.paymentStatus;
+    if (args.paymentMethod) where.paymentMethod = args.paymentMethod;
+    if (args.placedFrom || args.placedTo) {
+      where.placedAt = {};
+      if (args.placedFrom) where.placedAt.gte = args.placedFrom;
+      if (args.placedTo) where.placedAt.lte = args.placedTo;
+    }
+    if (args.search) {
+      const q = args.search.trim();
+      where.OR = [
+        { orderNumber: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { phone: { contains: q } },
+        { shippingAddress: { is: { trackingNumber: { contains: q, mode: 'insensitive' } } } },
+        { shippingAddress: { is: { name: { contains: q, mode: 'insensitive' } } } },
+      ];
+    }
+
+    const orderBy: import('@vivasvana/db').Prisma.OrderOrderByWithRelationInput = (() => {
+      switch (args.sort) {
+        case 'placedAt-asc':
+          return { placedAt: 'asc' as const };
+        case 'total-desc':
+          return { total: 'desc' as const };
+        case 'total-asc':
+          return { total: 'asc' as const };
+        case 'placedAt-desc':
+        default:
+          return { placedAt: 'desc' as const };
+      }
+    })();
+
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.order.count({ where }),
+      this.prisma.order.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          items: { select: { id: true, title: true, quantity: true } },
+          shippingAddress: { select: { name: true, city: true, state: true, trackingNumber: true, carrier: true } },
+        },
+      }),
+    ]);
+
+    return { total, items, page, pageSize };
+  }
+
+  async adminGet(orderId: string) {
+    return this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: true,
+        shippingAddress: true,
+        payments: { orderBy: { createdAt: 'desc' } },
+        user: { select: { id: true, email: true, name: true, role: true, createdAt: true } },
+      },
+    });
+  }
+
+  /**
+   * Manual status transitions for admins. Each transition records the
+   * timestamp on the order and is restricted to a valid source state.
+   *
+   * Allowed transitions:
+   *   PENDING        → CONFIRMED | CANCELLED
+   *   CONFIRMED      → PACKED    | CANCELLED
+   *   PACKED         → SHIPPED   (requires tracking) | CANCELLED
+   *   SHIPPED        → DELIVERED | RETURNED
+   *   DELIVERED      → RETURNED  | REFUNDED
+   *   CANCELLED      → (terminal)
+   *   RETURNED       → REFUNDED  (terminal)
+   *   REFUNDED       → (terminal)
+   */
+  async adminConfirm(orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new Error('ORDER_NOT_FOUND');
+    if (order.status !== 'PENDING') throw new Error('INVALID_TRANSITION');
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'CONFIRMED', confirmedAt: new Date() },
+      include: { items: true, shippingAddress: true, payments: true },
+    });
+  }
+
+  async adminMarkPacked(orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new Error('ORDER_NOT_FOUND');
+    if (order.status !== 'CONFIRMED') throw new Error('INVALID_TRANSITION');
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: 'PACKED', packedAt: new Date() },
+      include: { items: true, shippingAddress: true, payments: true },
+    });
+  }
+
+  /**
+   * Ship the order: persists carrier + tracking number on order_shipping
+   * and flips status to SHIPPED with shippedAt timestamp. Required from
+   * PACKED state only (admins must explicitly mark packed first so we
+   * don't accidentally ship un-packed orders).
+   */
+  async adminShip(
+    orderId: string,
+    args: { carrier: string; trackingNumber: string; trackingUrl?: string },
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { shippingAddress: true },
+      });
+      if (!order) throw new Error('ORDER_NOT_FOUND');
+      if (order.status !== 'PACKED') throw new Error('INVALID_TRANSITION');
+      if (!order.shippingAddress) throw new Error('MISSING_SHIPPING_ADDRESS');
+
+      const now = new Date();
+      await tx.orderShipping.update({
+        where: { orderId },
+        data: {
+          carrier: args.carrier.trim(),
+          trackingNumber: args.trackingNumber.trim(),
+          trackingUrl: args.trackingUrl?.trim() || null,
+          shippedAt: now,
+        },
+      });
+      return tx.order.update({
+        where: { id: orderId },
+        data: { status: 'SHIPPED', shippedAt: now },
+        include: { items: true, shippingAddress: true, payments: true },
+      });
+    });
+  }
+
+  /** Update tracking number on an already-SHIPPED order (typo fixes). */
+  async adminUpdateTracking(
+    orderId: string,
+    args: { carrier?: string; trackingNumber?: string; trackingUrl?: string },
+  ) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new Error('ORDER_NOT_FOUND');
+    if (order.status !== 'SHIPPED' && order.status !== 'DELIVERED') {
+      throw new Error('INVALID_TRANSITION');
+    }
+    await this.prisma.orderShipping.update({
+      where: { orderId },
+      data: {
+        ...(args.carrier !== undefined ? { carrier: args.carrier.trim() } : {}),
+        ...(args.trackingNumber !== undefined
+          ? { trackingNumber: args.trackingNumber.trim() }
+          : {}),
+        ...(args.trackingUrl !== undefined
+          ? { trackingUrl: args.trackingUrl?.trim() || null }
+          : {}),
+      },
+    });
+    return this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true, shippingAddress: true, payments: true },
+    });
+  }
+
+  async adminMarkDelivered(orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new Error('ORDER_NOT_FOUND');
+    if (order.status !== 'SHIPPED') throw new Error('INVALID_TRANSITION');
+
+    const now = new Date();
+    return this.prisma.$transaction(async (tx) => {
+      await tx.orderShipping.update({ where: { orderId }, data: { deliveredAt: now } });
+      // COD payment is collected on delivery — mark the pending payment as PAID
+      // so the books reflect cash received.
+      if (order.paymentMethod === 'COD') {
+        await tx.payment.updateMany({
+          where: { orderId, status: 'PENDING', gateway: 'COD' },
+          data: { status: 'PAID' },
+        });
+        await tx.order.update({
+          where: { id: orderId },
+          data: { paymentStatus: 'PAID' },
+        });
+      }
+      return tx.order.update({
+        where: { id: orderId },
+        data: { status: 'DELIVERED', deliveredAt: now },
+        include: { items: true, shippingAddress: true, payments: true },
+      });
+    });
+  }
+
+  /**
+   * Admin cancel — works from PENDING / CONFIRMED / PACKED. Restocks
+   * inventory and rolls back discount usage. After SHIPPED, use return
+   * + refund flow instead (don't restock from a shipped order — the
+   * goods are gone until they're returned).
+   */
+  async adminCancel(orderId: string, reason?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (!order) throw new Error('ORDER_NOT_FOUND');
+      if (!['PENDING', 'CONFIRMED', 'PACKED'].includes(order.status)) {
+        throw new Error('INVALID_TRANSITION');
+      }
+
+      // Restore stock
+      for (const it of order.items) {
+        if (it.variantId) {
+          await tx.productVariant.update({
+            where: { id: it.variantId },
+            data: { stock: { increment: it.quantity } },
+          });
+        } else if (it.productId) {
+          await tx.product.update({
+            where: { id: it.productId },
+            data: { stock: { increment: it.quantity } },
+          });
+        }
+        await tx.stockMovement.create({
+          data: {
+            productId: it.productId!,
+            variantId: it.variantId,
+            delta: it.quantity,
+            reason: 'RETURN',
+            reference: `${order.orderNumber}:admin-cancel${reason ? `:${reason}` : ''}`,
+          },
+        });
+      }
+
+      // Roll back the discount usage if any
+      if (order.discountCode) {
+        await tx.discount.updateMany({
+          where: { code: order.discountCode, usedCount: { gt: 0 } },
+          data: { usedCount: { decrement: 1 } },
+        });
+      }
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          notes: reason ? `${order.notes ?? ''}\n[Cancel reason]: ${reason}`.trim() : order.notes,
+        },
+        include: { items: true, shippingAddress: true, payments: true },
+      });
+    });
+  }
+
+  /**
+   * Mark as RETURNED + restock. Use after a SHIPPED/DELIVERED order
+   * comes back. The refund itself is a separate payment-side step.
+   */
+  async adminMarkReturned(orderId: string, reason?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true },
+      });
+      if (!order) throw new Error('ORDER_NOT_FOUND');
+      if (!['SHIPPED', 'DELIVERED'].includes(order.status)) {
+        throw new Error('INVALID_TRANSITION');
+      }
+
+      for (const it of order.items) {
+        if (it.variantId) {
+          await tx.productVariant.update({
+            where: { id: it.variantId },
+            data: { stock: { increment: it.quantity } },
+          });
+        } else if (it.productId) {
+          await tx.product.update({
+            where: { id: it.productId },
+            data: { stock: { increment: it.quantity } },
+          });
+        }
+        await tx.stockMovement.create({
+          data: {
+            productId: it.productId!,
+            variantId: it.variantId,
+            delta: it.quantity,
+            reason: 'RETURN',
+            reference: `${order.orderNumber}:return${reason ? `:${reason}` : ''}`,
+          },
+        });
+      }
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: 'RETURNED',
+          notes: reason ? `${order.notes ?? ''}\n[Return reason]: ${reason}`.trim() : order.notes,
+        },
+        include: { items: true, shippingAddress: true, payments: true },
+      });
+    });
+  }
+
+  /**
+   * Record a refund. Phase 3 will wire this to the Razorpay refund API;
+   * for now this is a bookkeeping operation that flips payment_status
+   * and inserts a Payment row of status REFUNDED.
+   */
+  async adminRefund(orderId: string, args: { amount: string; reason?: string }) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { payments: true },
+    });
+    if (!order) throw new Error('ORDER_NOT_FOUND');
+    if (!['DELIVERED', 'RETURNED', 'CANCELLED'].includes(order.status)) {
+      throw new Error('INVALID_TRANSITION');
+    }
+    if (parseFloat(args.amount) <= 0) throw new Error('INVALID_REFUND_AMOUNT');
+    if (parseFloat(args.amount) > parseFloat(order.total.toString())) {
+      throw new Error('REFUND_EXCEEDS_TOTAL');
+    }
+
+    const orderTotal = parseFloat(order.total.toString());
+    const refundAmount = parseFloat(args.amount);
+    const isFullRefund = refundAmount >= orderTotal;
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.payment.create({
+        data: {
+          orderId,
+          gateway: order.paymentMethod,
+          amount: args.amount,
+          currency: order.currency,
+          status: 'REFUNDED',
+          failureReason: args.reason ?? null,
+          rawResponse: { admin: true, reason: args.reason, refundedAt: new Date().toISOString() },
+        },
+      });
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          paymentStatus: isFullRefund ? 'REFUNDED' : 'PARTIAL_REFUNDED',
+          status: order.status === 'DELIVERED' ? 'REFUNDED' : order.status,
+          notes: args.reason
+            ? `${order.notes ?? ''}\n[Refund ₹${args.amount}]: ${args.reason}`.trim()
+            : order.notes,
+        },
+        include: { items: true, shippingAddress: true, payments: true },
+      });
+    });
+  }
 }

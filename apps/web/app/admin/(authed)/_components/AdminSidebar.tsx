@@ -2,20 +2,42 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { LayoutDashboard, Package, ShoppingCart, Users, Tag, FileText, Settings, LogOut, BarChart3 } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  Users,
+  Tag,
+  FileText,
+  Settings,
+  LogOut,
+  BarChart3,
+  UserCog,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
+import { useAdminMe } from './AdminMeProvider';
+import type { Permission } from '@/lib/admin-permissions';
 
-const nav = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/admin/products', label: 'Products', icon: Package },
-  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart },
-  { href: '/admin/customers', label: 'Customers', icon: Users },
-  { href: '/admin/discounts', label: 'Discounts', icon: Tag },
-  { href: '/admin/blog', label: 'Blog', icon: FileText },
-  { href: '/admin/settings', label: 'Settings', icon: Settings },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  /** Any one of these is enough to show the link. */
+  permissions: Permission[];
+}
+
+const NAV: NavItem[] = [
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, permissions: ['view_dashboard'] },
+  { href: '/admin/reports', label: 'Reports', icon: BarChart3, permissions: ['view_reports'] },
+  { href: '/admin/products', label: 'Products', icon: Package, permissions: ['view_products', 'manage_products'] },
+  { href: '/admin/orders', label: 'Orders', icon: ShoppingCart, permissions: ['view_orders', 'manage_orders'] },
+  { href: '/admin/customers', label: 'Customers', icon: Users, permissions: ['view_customers', 'manage_customers'] },
+  { href: '/admin/discounts', label: 'Discounts', icon: Tag, permissions: ['view_discounts', 'manage_discounts'] },
+  { href: '/admin/blog', label: 'Blog', icon: FileText, permissions: ['view_blog', 'manage_blog'] },
+  { href: '/admin/staff', label: 'Staff', icon: UserCog, permissions: ['manage_staff'] },
+  { href: '/admin/settings', label: 'Settings', icon: Settings, permissions: ['manage_settings'] },
 ];
 
 interface Props {
@@ -26,6 +48,7 @@ interface Props {
 export function AdminSidebar({ userEmail, devMode = false }: Props) {
   const pathname = usePathname();
   const router = useRouter();
+  const { me, loading } = useAdminMe();
 
   async function signOut() {
     const supabase = createSupabaseBrowserClient();
@@ -33,6 +56,14 @@ export function AdminSidebar({ userEmail, devMode = false }: Props) {
     router.push('/admin/login');
     router.refresh();
   }
+
+  // Until /me responds, show all items in a low-opacity placeholder state so
+  // the layout doesn't jump. Once loaded, filter strictly.
+  const visible = loading
+    ? NAV
+    : NAV.filter((item) =>
+        item.permissions.some((p) => me?.permissions.includes(p)),
+      );
 
   return (
     <aside className="flex flex-col gap-1 border-r bg-background p-4 md:sticky md:top-0 md:h-screen">
@@ -46,7 +77,7 @@ export function AdminSidebar({ userEmail, devMode = false }: Props) {
       </div>
 
       <nav className="flex flex-1 flex-col gap-1">
-        {nav.map(({ href, label, icon: Icon }) => {
+        {visible.map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/admin' && pathname.startsWith(href));
           return (
             <Link
@@ -57,6 +88,7 @@ export function AdminSidebar({ userEmail, devMode = false }: Props) {
                 active
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                loading && 'opacity-60',
               )}
             >
               <Icon className="h-4 w-4" />
@@ -67,7 +99,10 @@ export function AdminSidebar({ userEmail, devMode = false }: Props) {
       </nav>
 
       <div className="mt-4 border-t pt-4">
-        <p className="truncate px-2 text-xs text-muted-foreground">{userEmail}</p>
+        <p className="truncate px-2 text-xs font-medium">{me?.name ?? userEmail}</p>
+        <p className="truncate px-2 text-[10px] uppercase tracking-wide text-muted-foreground">
+          {me?.roleLabel ?? (loading ? '…' : 'Staff')}
+        </p>
         {!devMode && (
           <Button
             variant="ghost"

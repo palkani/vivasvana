@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { AdminSidebar } from './_components/AdminSidebar';
 import { DevAuthBanner } from './_components/DevAuthBanner';
+import { AdminMeProvider } from './_components/AdminMeProvider';
 
 const ADMIN_AUTH_DISABLED =
   process.env.NODE_ENV !== 'production' &&
@@ -13,17 +14,24 @@ const ADMIN_AUTH_DISABLED =
  * Dev bypass: when ADMIN_AUTH_DISABLED is set (and non-prod), skip the
  * Supabase call entirely and render the admin shell with a stub identity
  * plus a visible warning banner so the bypass is never invisible.
+ *
+ * Permission gating: AdminMeProvider fetches /api/admin/me on mount; the
+ * sidebar hides nav items the user lacks permission for, and individual
+ * pages can use useAdminMe() / can() for finer control. Server-side
+ * enforcement still lives in the API.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   if (ADMIN_AUTH_DISABLED) {
     return (
-      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_1fr]">
-        <AdminSidebar userEmail="dev@local (auth disabled)" devMode />
-        <main className="bg-muted/30">
-          <DevAuthBanner />
-          <div className="p-4 md:p-8">{children}</div>
-        </main>
-      </div>
+      <AdminMeProvider>
+        <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_1fr]">
+          <AdminSidebar userEmail="dev@local (auth disabled)" devMode />
+          <main className="bg-muted/30">
+            <DevAuthBanner />
+            <div className="p-4 md:p-8">{children}</div>
+          </main>
+        </div>
+      </AdminMeProvider>
     );
   }
 
@@ -46,9 +54,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_1fr]">
-      <AdminSidebar userEmail={user.email ?? ''} />
-      <main className="bg-muted/30 p-4 md:p-8">{children}</main>
-    </div>
+    <AdminMeProvider>
+      <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_1fr]">
+        <AdminSidebar userEmail={user.email ?? ''} />
+        <main className="bg-muted/30 p-4 md:p-8">{children}</main>
+      </div>
+    </AdminMeProvider>
   );
 }
