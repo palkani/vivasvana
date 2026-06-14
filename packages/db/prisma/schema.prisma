@@ -4,6 +4,14 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = []
+  // Force-bundle the Linux engines we run on:
+  //   - `native` keeps local dev fast (macOS / Apple Silicon)
+  //   - `debian-openssl-3.0.x` matches Railway's node:bookworm-slim
+  //     runtime (Debian 12 ships OpenSSL 3.0.x). Without this, Prisma's
+  //     build-time auto-detect falls back to a 1.1.x engine that can't
+  //     load on the runtime container.
+  //   - `linux-musl-openssl-3.0.x` covers Alpine bases if we ever swap.
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {

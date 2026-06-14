@@ -42,6 +42,15 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 FROM node:20.11.0-bookworm-slim AS build
 WORKDIR /repo
 
+# Prisma's `generate` step inspects the system OpenSSL to decide which
+# engine binary to drop in. node:bookworm-slim doesn't include openssl, so
+# Prisma silently falls back to a debian-openssl-1.1.x engine and the
+# resulting client crashes at runtime on Debian 12 (OpenSSL 3.0.x). Make
+# the detection explicit by installing the runtime here too.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN corepack enable && corepack prepare pnpm@9.12.0 --activate
 
 # Bring node_modules from the deps stage, then layer in the source. Source
