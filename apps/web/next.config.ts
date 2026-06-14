@@ -1,5 +1,24 @@
 import type { NextConfig } from 'next';
 
+// Diagnostic: surface which NEXT_PUBLIC_* env vars Vercel injected at
+// build time. Vercel scrubs values from logs by default; just printing
+// the KEY NAMES lets us see whether SUPABASE_URL / SUPABASE_ANON_KEY
+// actually reached the build. Remove once env wiring is stable.
+const publicKeys = Object.keys(process.env)
+  .filter((k) => k.startsWith('NEXT_PUBLIC_'))
+  .sort();
+const supabaseUrlPresent = !!process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonPresent = !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// eslint-disable-next-line no-console
+console.log('[vivasvana:build] NEXT_PUBLIC_* keys present:', publicKeys);
+// eslint-disable-next-line no-console
+console.log(
+  '[vivasvana:build] NEXT_PUBLIC_SUPABASE_URL present:',
+  supabaseUrlPresent,
+  '· NEXT_PUBLIC_SUPABASE_ANON_KEY present:',
+  supabaseAnonPresent,
+);
+
 const config: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
