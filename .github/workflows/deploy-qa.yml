@@ -100,10 +100,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Railway CLI
+        # `sh` on Ubuntu runners is dash (POSIX-strict). The Railway
+        # installer uses bashisms (parameter expansions like ${var,,}),
+        # so piping to `sh` fails with "Bad substitution". Force bash.
+        shell: bash
         run: |
-          # Pin a known-good version so a CLI breaking change doesn't
-          # silently break the pipeline. Bump intentionally.
-          curl -fsSL https://railway.com/install.sh | sh
+          curl -fsSL https://railway.com/install.sh | bash
           echo "$HOME/.railway/bin" >> "$GITHUB_PATH"
       - name: Deploy
         env:
