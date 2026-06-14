@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ContactService } from '../services/contact.service.js';
 
@@ -28,7 +28,7 @@ const ContactBody = z.object({
   loadedAt: z.number().int().optional(),
 });
 
-export default async function contactRoutes(app: FastifyInstance) {
+const contactRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new ContactService(app.prisma);
 
   app.post(
@@ -75,4 +75,7 @@ export default async function contactRoutes(app: FastifyInstance) {
       return reply.status(200).send({ accepted: true });
     },
   );
-}
+};
+
+export default contactRoutes;
+

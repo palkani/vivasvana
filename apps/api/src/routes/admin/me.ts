@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { ALL_PERMISSIONS, STAFF_ROLE_DESCRIPTIONS } from '../../lib/permissions.js';
 
 /**
@@ -9,7 +9,7 @@ import { ALL_PERMISSIONS, STAFF_ROLE_DESCRIPTIONS } from '../../lib/permissions.
  * so it doubles as "is logged into the admin area at all" without making the
  * caller declare a more specific permission. Also honors the dev-mode bypass.
  */
-export default async function adminMeRoute(app: FastifyInstance) {
+const adminMeRoute: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/api/admin/me',
     {
@@ -62,4 +62,7 @@ export default async function adminMeRoute(app: FastifyInstance) {
       };
     },
   );
-}
+};
+
+export default adminMeRoute;
+

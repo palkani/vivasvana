@@ -20,7 +20,7 @@ export default function NewBlogPostPage() {
         </Button>
         <h1 className="font-serif text-3xl font-semibold tracking-tight">New blog post</h1>
         <p className="text-sm text-muted-foreground">
-          Draft long-form content. Save as draft now, publish whenever you're ready.
+          Draft long-form content. Save as draft now, publish whenever you&rsquo;re ready.
         </p>
       </div>
       <BlogForm mode="create" initial={EMPTY_BLOG} />

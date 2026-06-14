@@ -1,4 +1,5 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyReply } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { PaymentService } from '../services/payment.service.js';
 import { NotificationService } from '../services/notification.service.js';
@@ -18,7 +19,7 @@ function mapPaymentError(err: unknown, reply: FastifyReply) {
 
 const PayOrderParams = z.object({ orderId: z.string().uuid() });
 
-export default async function paymentRoutes(app: FastifyInstance) {
+const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new PaymentService(app.prisma);
   const notifications = new NotificationService(app.prisma);
 
@@ -93,4 +94,7 @@ export default async function paymentRoutes(app: FastifyInstance) {
       }
     },
   );
-}
+};
+
+export default paymentRoutes;
+

@@ -221,7 +221,7 @@ export function StaffManager() {
           <p className="text-xs text-muted-foreground">
             The person must already have a customer account (they need to{' '}
             <span className="font-medium">sign up at /admin/login</span> first using the same email).
-            We'll find them by email and grant the selected role.
+            We&rsquo;ll find them by email and grant the selected role.
           </p>
         </CardHeader>
         <CardContent>

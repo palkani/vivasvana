@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ProductService } from '../../services/product.service.js';
 import { serializeMoney } from '../../lib/decimal.js';
@@ -49,11 +49,11 @@ const AdminListQuery = z.object({
   search: z.string().optional(),
 });
 
-export default async function adminProductRoutes(app: FastifyInstance) {
+const adminProductRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new ProductService(app.prisma);
 
   // Read scope: SUPPORT / CONTENT_EDITOR / INVENTORY / MANAGER + ADMIN.
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('view_products'));
 
     admin.get(
@@ -95,7 +95,7 @@ export default async function adminProductRoutes(app: FastifyInstance) {
   });
 
   // Write scope: INVENTORY / MANAGER + ADMIN.
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('manage_products'));
 
     admin.post(
@@ -199,4 +199,7 @@ export default async function adminProductRoutes(app: FastifyInstance) {
       },
     );
   });
-}
+};
+
+export default adminProductRoutes;
+

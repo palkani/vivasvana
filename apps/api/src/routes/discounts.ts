@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { DiscountService } from '../services/discount.service.js';
 
@@ -7,7 +7,7 @@ const ValidateBody = z.object({
   subtotal: z.coerce.number().min(0),
 });
 
-export default async function discountRoutes(app: FastifyInstance) {
+const discountRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new DiscountService(app.prisma);
 
   app.post(
@@ -27,4 +27,7 @@ export default async function discountRoutes(app: FastifyInstance) {
         userId: req.user?.id,
       }),
   );
-}
+};
+
+export default discountRoutes;
+

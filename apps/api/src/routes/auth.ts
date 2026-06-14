@@ -1,4 +1,5 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyReply } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { AuthService } from '../services/auth.service.js';
 import { OtpService } from '../services/otp.service.js';
@@ -67,7 +68,7 @@ function mapError(err: unknown, reply: FastifyReply) {
   throw err;
 }
 
-export default async function authRoutes(app: FastifyInstance) {
+const authRoutes: FastifyPluginAsyncZod = async (app) => {
   const otp = new OtpService(app.prisma);
   const service = new AuthService(app.prisma, otp);
 
@@ -139,4 +140,7 @@ export default async function authRoutes(app: FastifyInstance) {
       }
     },
   );
-}
+};
+
+export default authRoutes;
+

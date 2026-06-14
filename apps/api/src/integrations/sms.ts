@@ -79,7 +79,6 @@ export async function sendSms(msg: SmsMessage): Promise<{ sid: string | null }> 
   if (!c) {
     // Dev fallback so the flow can be tested end-to-end without a real
     // Twilio account. Logs the destination + first 100 chars of the body.
-    // eslint-disable-next-line no-console
     console.info('[sms:dev] would send', { to, body: msg.body.slice(0, 100) });
     return { sid: null };
   }

@@ -1,5 +1,8 @@
 import fp from 'fastify-plugin';
-import Redis from 'ioredis';
+// ioredis 5.10+ uses ESM-style exports; named `Redis` is the class, the
+// `default` is the namespace. Pull the class out explicitly so NodeNext
+// resolution stays happy in the build output.
+import { Redis } from 'ioredis';
 import { env } from '../config/env.js';
 
 declare module 'fastify' {
@@ -16,7 +19,7 @@ export default fp(
       enableOfflineQueue: false,
     });
 
-    client.on('error', (err) => {
+    client.on('error', (err: Error) => {
       app.log.error({ err }, 'redis error');
     });
 

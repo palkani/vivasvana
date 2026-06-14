@@ -1,10 +1,11 @@
 import fp from 'fastify-plugin';
+import type { FastifyError } from 'fastify';
 import { ZodError } from 'zod';
 import { Prisma } from '@vivasvana/db';
 
 export default fp(
   async (app) => {
-    app.setErrorHandler((err, req, reply) => {
+    app.setErrorHandler((err: FastifyError, req, reply) => {
       if (err instanceof ZodError) {
         return reply.status(400).send({
           error: 'ValidationError',

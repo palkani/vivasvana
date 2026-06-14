@@ -1,4 +1,5 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyReply } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { DiscountService } from '../../services/discount.service.js';
 
@@ -47,11 +48,11 @@ function mapError(err: unknown, reply: FastifyReply) {
   throw err;
 }
 
-export default async function adminDiscountRoutes(app: FastifyInstance) {
+const adminDiscountRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new DiscountService(app.prisma);
 
   // Read scope.
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('view_discounts'));
 
     admin.get(
@@ -87,7 +88,7 @@ export default async function adminDiscountRoutes(app: FastifyInstance) {
   });
 
   // Write scope.
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('manage_discounts'));
 
     admin.post(
@@ -187,4 +188,7 @@ export default async function adminDiscountRoutes(app: FastifyInstance) {
       },
     );
   });
-}
+};
+
+export default adminDiscountRoutes;
+

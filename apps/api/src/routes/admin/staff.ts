@@ -1,4 +1,5 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyReply } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { StaffService } from '../../services/staff.service.js';
 import { STAFF_ROLE_DESCRIPTIONS } from '../../lib/permissions.js';
@@ -45,13 +46,13 @@ function mapError(err: unknown, reply: FastifyReply) {
   throw err;
 }
 
-export default async function adminStaffRoutes(app: FastifyInstance) {
+const adminStaffRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new StaffService(app.prisma);
 
   // ALL staff-management endpoints require true ADMIN, not just any
   // staff role. This is intentional — adding employees is an owner-level
   // operation and must not be delegatable to staff with manage_X permissions.
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requireAdmin);
 
     admin.get(
@@ -164,4 +165,7 @@ export default async function adminStaffRoutes(app: FastifyInstance) {
       },
     );
   });
-}
+};
+
+export default adminStaffRoutes;
+

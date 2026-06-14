@@ -125,6 +125,6 @@ export class StaffService {
   }
 
   // Re-exported so the route file doesn't need to import from lib directly.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  // The leading underscore opts out of @typescript-eslint/no-unused-vars.
   static readonly _typeGuard: Prisma.UserWhereInput | undefined = undefined;
 }

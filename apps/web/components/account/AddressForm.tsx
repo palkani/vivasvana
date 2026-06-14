@@ -108,7 +108,10 @@ export function AddressForm({ initial, onSaved, onCancel }: Props) {
           <label className="flex flex-col gap-1 md:col-span-2">
             <span className="text-sm font-medium">Landmark</span>
             <Input
-              value={form.landmark}
+              // Address.landmark can be null from the API; controlled inputs
+              // need a string, never null, or React warns about flipping to
+              // uncontrolled.
+              value={form.landmark ?? ''}
               onChange={(e) => update('landmark', e.target.value)}
               placeholder="Nearby landmark (optional)"
             />

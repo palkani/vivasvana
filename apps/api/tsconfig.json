@@ -8,6 +8,7 @@
     "moduleResolution": "Bundler",
     "module": "ESNext"
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
-  "exclude": ["node_modules", "dist"]
+  "// include": "test/** is checked by vitest with its own tsconfig path; pulling it in here breaks the rootDir constraint because the test folder is a sibling of src.",
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "test"]
 }

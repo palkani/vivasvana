@@ -1,4 +1,5 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyReply } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { OrderService } from '../../services/order.service.js';
 import { NotificationService } from '../../services/notification.service.js';
@@ -62,12 +63,12 @@ function mapError(err: unknown, reply: FastifyReply) {
   throw err;
 }
 
-export default async function adminOrderRoutes(app: FastifyInstance) {
+const adminOrderRoutes: FastifyPluginAsyncZod = async (app) => {
   const orders = new OrderService(app.prisma);
   const notifications = new NotificationService(app.prisma);
 
   // Read scope: SUPPORT / ORDER_MANAGER / MANAGER + ADMIN.
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('view_orders'));
 
     admin.get(
@@ -103,7 +104,7 @@ export default async function adminOrderRoutes(app: FastifyInstance) {
   });
 
   // Write scope: ORDER_MANAGER / MANAGER + ADMIN (mutates fulfilment state).
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('manage_orders'));
 
     // ---- Status transitions ----------------------------------------
@@ -258,4 +259,7 @@ export default async function adminOrderRoutes(app: FastifyInstance) {
       },
     );
   });
-}
+};
+
+export default adminOrderRoutes;
+

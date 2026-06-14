@@ -1,4 +1,5 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyReply } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { OrderService } from '../services/order.service.js';
@@ -91,7 +92,7 @@ function ensureSessionCookie(req: import('fastify').FastifyRequest, reply: Fasti
   return sid;
 }
 
-export default async function orderRoutes(app: FastifyInstance) {
+const orderRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new OrderService(app.prisma);
 
   // -- Create order (guest OR user) --------------------------------------
@@ -163,7 +164,7 @@ export default async function orderRoutes(app: FastifyInstance) {
   );
 
   // -- My orders (auth) --------------------------------------------------
-  app.register(async (auth) => {
+  app.register(async (auth: typeof app) => {
     auth.addHook('preHandler', auth.authenticate);
 
     auth.get(
@@ -228,4 +229,7 @@ export default async function orderRoutes(app: FastifyInstance) {
       },
     );
   });
-}
+};
+
+export default orderRoutes;
+

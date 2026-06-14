@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Leaf, Sprout, Truck, MapPin } from 'lucide-react';
 import { api, type ApiError } from '@/lib/api';
@@ -82,8 +83,8 @@ export default async function ProductPage({ params }: PageProps) {
 
       <div className="container py-8 md:py-12">
         <nav className="mb-6 text-sm text-muted-foreground">
-          <a href="/" className="hover:text-foreground">Home</a> /{' '}
-          <a href="/products" className="hover:text-foreground">Shop</a> /{' '}
+          <Link href="/" className="hover:text-foreground">Home</Link> /{' '}
+          <Link href="/products" className="hover:text-foreground">Shop</Link> /{' '}
           <span className="text-foreground">{product.title}</span>
         </nav>
 

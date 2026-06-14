@@ -10,7 +10,7 @@
  * bundle a giant cities dataset client-side.
  */
 
-import type Redis from 'ioredis';
+import type { Redis } from 'ioredis';
 
 export interface PinLookupResult {
   pincode: string;
@@ -87,7 +87,7 @@ export async function lookupPincode(pin: string, redis?: Redis): Promise<PinLook
     }
   }
 
-  let result: PinLookupResult | null = null;
+  let result: PinLookupResult | null;
   try {
     const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
     if (!res.ok) return null;
@@ -168,7 +168,7 @@ export async function searchCitiesByName(
     }
   }
 
-  let hits: CitySearchHit[] = [];
+  let hits: CitySearchHit[];
   try {
     const res = await fetch(
       `https://api.postalpincode.in/postoffice/${encodeURIComponent(q)}`,

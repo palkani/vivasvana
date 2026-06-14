@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ReportsService, type ReportRange } from '../../services/reports.service.js';
 
@@ -6,10 +6,10 @@ const RangeQuery = z.object({
   range: z.enum(['30d', '90d', '365d', 'all']).default('30d'),
 });
 
-export default async function adminReportsRoutes(app: FastifyInstance) {
+const adminReportsRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new ReportsService(app.prisma);
 
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('view_reports'));
 
     admin.get(
@@ -51,4 +51,7 @@ export default async function adminReportsRoutes(app: FastifyInstance) {
       async (req) => ({ items: await service.stateSales(req.query.range as ReportRange) }),
     );
   });
-}
+};
+
+export default adminReportsRoutes;
+

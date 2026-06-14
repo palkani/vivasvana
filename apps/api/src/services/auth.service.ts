@@ -90,7 +90,10 @@ export class AuthService {
       // knows what's wrong rather than seeing a generic 500.
       const msg = (err as { message?: string })?.message ?? '';
       if (msg.includes('fetch failed') || msg.includes('ECONNREFUSED')) {
-        throw new Error('SUPABASE_UNREACHABLE');
+        // Preserve the original network error as the `cause` so the
+        // server logs still carry the stack trace even though the
+        // route layer maps SUPABASE_UNREACHABLE to a friendly 503.
+        throw new Error('SUPABASE_UNREACHABLE', { cause: err });
       }
       throw err;
     }

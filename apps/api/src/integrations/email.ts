@@ -32,7 +32,6 @@ export async function sendEmail(msg: EmailMessage): Promise<{ id: string | null 
   const c = client();
   if (!c) {
     // Dev fallback so flow tests work without an API key
-    // eslint-disable-next-line no-console
     console.info('[email:dev] would send', {
       to: msg.to,
       subject: msg.subject,

@@ -67,7 +67,7 @@ export default async function BlogIndexPage({ searchParams }: PageProps) {
         <div className="mx-auto max-w-xl rounded-lg border bg-muted/40 p-12 text-center">
           <p className="text-lg">No posts published yet.</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            We're cooking up our first stories — check back soon.
+            We&rsquo;re cooking up our first stories — check back soon.
           </p>
         </div>
       ) : (

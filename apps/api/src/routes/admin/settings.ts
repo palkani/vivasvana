@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { SettingsService } from '../../services/settings.service.js';
 
@@ -39,10 +39,10 @@ const UpdateBody = z.object({
   }),
 });
 
-export default async function adminSettingsRoutes(app: FastifyInstance) {
+const adminSettingsRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new SettingsService(app.prisma);
 
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('manage_settings'));
 
     admin.get(
@@ -100,4 +100,7 @@ export default async function adminSettingsRoutes(app: FastifyInstance) {
       };
     },
   );
-}
+};
+
+export default adminSettingsRoutes;
+

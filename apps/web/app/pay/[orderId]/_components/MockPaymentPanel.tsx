@@ -2,7 +2,6 @@
 
 import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -97,15 +96,11 @@ export function MockPaymentPanel({ order }: Props) {
             <dd className="text-right">{order.paymentMethod}</dd>
             <dt className="text-muted-foreground">Status</dt>
             <dd className="text-right">
-              <Badge
-                variant={
-                  order.paymentStatus === 'FAILED'
-                    ? 'outline'
-                    : order.paymentStatus === 'PAID'
-                      ? 'success'
-                      : 'outline'
-                }
-              >
+              {/* PAID short-circuits to a success screen earlier in the
+                  component, so the only states reachable here are PENDING,
+                  AUTHORIZED, REFUNDED, PARTIAL_REFUNDED, and FAILED — none
+                  of which warrant a green badge. */}
+              <Badge variant="outline">
                 {order.paymentStatus.toLowerCase()}
               </Badge>
             </dd>

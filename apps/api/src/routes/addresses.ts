@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { AddressService } from '../services/address.service.js';
 
@@ -23,10 +23,10 @@ const AddressBody = z.object({
   isDefault: z.boolean().optional(),
 });
 
-export default async function addressRoutes(app: FastifyInstance) {
+const addressRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new AddressService(app.prisma);
 
-  app.register(async (auth) => {
+  app.register(async (auth: typeof app) => {
     auth.addHook('preHandler', auth.authenticate);
 
     auth.get(
@@ -103,4 +103,7 @@ export default async function addressRoutes(app: FastifyInstance) {
       },
     );
   });
-}
+};
+
+export default addressRoutes;
+

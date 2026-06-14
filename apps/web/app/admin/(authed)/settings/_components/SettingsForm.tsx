@@ -259,7 +259,7 @@ export function SettingsForm() {
               required
             />
             <span className="block text-xs text-muted-foreground">
-              Applied only when a product doesn't set its own rate.
+              Applied only when a product doesn&rsquo;t set its own rate.
             </span>
           </Field>
           <label className="flex items-center gap-2 text-sm pt-6">

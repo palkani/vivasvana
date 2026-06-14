@@ -1,4 +1,5 @@
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyReply } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { BlogService } from '../../services/blog.service.js';
 
@@ -35,11 +36,11 @@ function mapError(err: unknown, reply: FastifyReply) {
   throw err;
 }
 
-export default async function adminBlogRoutes(app: FastifyInstance) {
+const adminBlogRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new BlogService(app.prisma);
 
   // Read scope.
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('view_blog'));
 
     admin.get(
@@ -74,7 +75,7 @@ export default async function adminBlogRoutes(app: FastifyInstance) {
   });
 
   // Write scope.
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('manage_blog'));
 
     admin.post(
@@ -167,4 +168,7 @@ export default async function adminBlogRoutes(app: FastifyInstance) {
       },
     );
   });
-}
+};
+
+export default adminBlogRoutes;
+

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { BlogService } from '../services/blog.service.js';
 
@@ -10,7 +10,7 @@ const ListQuery = z.object({
 
 const SlugParam = z.object({ slug: z.string().min(1).max(160) });
 
-export default async function blogRoutes(app: FastifyInstance) {
+const blogRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new BlogService(app.prisma);
 
   app.get(
@@ -40,4 +40,7 @@ export default async function blogRoutes(app: FastifyInstance) {
       return post;
     },
   );
-}
+};
+
+export default blogRoutes;
+

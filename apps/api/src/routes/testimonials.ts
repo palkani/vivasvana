@@ -1,7 +1,7 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-export default async function testimonialRoutes(app: FastifyInstance) {
+const testimonialRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/api/testimonials',
     {
@@ -22,4 +22,7 @@ export default async function testimonialRoutes(app: FastifyInstance) {
       return { items };
     },
   );
-}
+};
+
+export default testimonialRoutes;
+

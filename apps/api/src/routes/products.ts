@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { ProductService } from '../services/product.service.js';
 import { serializeMoney } from '../lib/decimal.js';
@@ -15,7 +15,7 @@ const ListQuery = z.object({
   search: z.string().optional(),
 });
 
-export default async function productRoutes(app: FastifyInstance) {
+const productRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new ProductService(app.prisma);
 
   app.get(
@@ -48,4 +48,7 @@ export default async function productRoutes(app: FastifyInstance) {
       return serializeMoney(product);
     },
   );
-}
+};
+
+export default productRoutes;
+

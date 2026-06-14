@@ -1,7 +1,7 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 
-export default async function healthRoutes(app: FastifyInstance) {
+const healthRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/health',
     {
@@ -55,4 +55,6 @@ export default async function healthRoutes(app: FastifyInstance) {
       });
     },
   );
-}
+};
+
+export default healthRoutes;

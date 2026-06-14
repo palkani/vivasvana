@@ -1,8 +1,8 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { lookupPincode, searchCitiesByName } from '../integrations/india-post.js';
 
-export default async function indiaPostRoutes(app: FastifyInstance) {
+const indiaPostRoutes: FastifyPluginAsyncZod = async (app) => {
   app.get(
     '/api/pincode/:pin',
     {
@@ -37,4 +37,7 @@ export default async function indiaPostRoutes(app: FastifyInstance) {
       return { items: hits };
     },
   );
-}
+};
+
+export default indiaPostRoutes;
+

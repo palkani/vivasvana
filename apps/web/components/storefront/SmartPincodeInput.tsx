@@ -10,7 +10,6 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 import { usePincodeLookup } from '@/lib/use-pincode-lookup';
 import type { PinLookupResult } from '@/lib/types';
 
@@ -260,7 +259,9 @@ function useCachedPin(pincode: string): PinLookupResult | null {
     if (!hit) return null;
     // 30-day TTL mirrors the server-side Redis cache.
     if (Date.now() - hit.ts > 30 * 24 * 60 * 60 * 1000) return null;
-    const { ts: _ts, ...rest } = hit;
+    // Strip the `ts` field — only used for TTL bookkeeping, not by callers.
+    const { ts, ...rest } = hit;
+    void ts;
     return rest;
   }, [pincode]);
 }

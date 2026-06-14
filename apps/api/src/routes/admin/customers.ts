@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { CustomerService } from '../../services/customer.service.js';
 import { serializeMoney } from '../../lib/decimal.js';
@@ -15,10 +15,10 @@ const ListQuery = z.object({
 
 const IdParam = z.object({ id: z.string().uuid() });
 
-export default async function adminCustomerRoutes(app: FastifyInstance) {
+const adminCustomerRoutes: FastifyPluginAsyncZod = async (app) => {
   const customers = new CustomerService(app.prisma);
 
-  app.register(async (admin) => {
+  app.register(async (admin: typeof app) => {
     admin.addHook('preHandler', admin.requirePermission('view_customers'));
 
     admin.get(
@@ -51,4 +51,7 @@ export default async function adminCustomerRoutes(app: FastifyInstance) {
       },
     );
   });
-}
+};
+
+export default adminCustomerRoutes;
+

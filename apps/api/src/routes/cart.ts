@@ -1,4 +1,5 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyRequest } from 'fastify';
+import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { CartService } from '../services/cart.service.js';
@@ -61,7 +62,7 @@ function mapServiceError(err: unknown, reply: import('fastify').FastifyReply) {
   throw err;
 }
 
-export default async function cartRoutes(app: FastifyInstance) {
+const cartRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new CartService(app.prisma);
 
   app.get(
@@ -176,4 +177,7 @@ export default async function cartRoutes(app: FastifyInstance) {
       return serializeMoney(merged);
     },
   );
-}
+};
+
+export default cartRoutes;
+

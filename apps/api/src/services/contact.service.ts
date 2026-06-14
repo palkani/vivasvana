@@ -32,6 +32,9 @@ export interface ContactResult {
 const HTML_INJECTION_RE =
   /<script\b|<iframe\b|<object\b|<embed\b|javascript:|onerror\s*=|onload\s*=|onclick\s*=|data:text\/html/i;
 const URL_RE = /https?:\/\/|www\.[a-z]/gi;
+// Control characters are part of the spam fingerprint — bots love to slip in
+// NULs and tabs to bypass naive substring checks. The match is intentional.
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS_RE = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 const MIN_SUBMIT_MS = 2000; // a real human takes >2s to fill a form
 const MAX_URLS = 2;
