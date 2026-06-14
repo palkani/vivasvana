@@ -10,6 +10,9 @@
 
   "framework": "nextjs",
 
+  "// outputDirectory": "Explicit so Vercel doesn't fall back to looking for `public/` when its framework auto-detection gets confused by the monorepo install dance. Relative to the Root Directory (apps/web).",
+  "outputDirectory": ".next",
+
   "// ignoreCommand": "Skip rebuild if neither apps/web nor packages/* changed. `cd ../..` to run git from the repo root. Exit 0 = skip, Exit 1 = build.",
   "ignoreCommand": "cd ../.. && git diff --quiet HEAD^ HEAD -- apps/web packages || exit 1"
 }
