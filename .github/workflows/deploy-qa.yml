@@ -91,6 +91,12 @@ jobs:
         # rewrite history.
         run: pnpm --filter @vivasvana/db run migrate:deploy
 
+      - name: Seed catalog (QA only — idempotent upsert by slug)
+        # Bypass the `seed` package.json script because it has
+        # `tsx --env-file=.env` which crashes when .env isn't on disk
+        # (CI injects env vars directly). Same prisma/seed.ts source.
+        run: pnpm --filter @vivasvana/db exec tsx prisma/seed.ts
+
   deploy-api:
     name: Deploy API → Railway (QA)
     needs: migrate
