@@ -59,9 +59,11 @@ COPY apps/api ./apps/api
 COPY packages/db ./packages/db
 COPY packages/config ./packages/config
 
-# Generate the Prisma client (schema-only — no DB connection needed) and
-# compile the TypeScript source to dist/.
-RUN pnpm --filter @vivasvana/db generate
+# Build the db package first — its `build` script runs `prisma generate`
+# AND `tsc` so packages/db/dist/index.js exists at runtime. Plain Node can't
+# import .ts files, so @vivasvana/db must be compiled before the API tries
+# to require it. Then compile the API itself.
+RUN pnpm --filter @vivasvana/db build
 RUN pnpm --filter @vivasvana/api build
 
 # Trim node_modules to production-only so the runtime image stays small.
@@ -99,7 +101,10 @@ COPY --from=build --chown=app:app /repo/apps/api/dist ./apps/api/dist
 COPY --from=build --chown=app:app /repo/packages/db/package.json ./packages/db/package.json
 COPY --from=build --chown=app:app /repo/packages/db/node_modules ./packages/db/node_modules
 COPY --from=build --chown=app:app /repo/packages/db/prisma ./packages/db/prisma
-COPY --from=build --chown=app:app /repo/packages/db/src ./packages/db/src
+# dist holds the compiled .js — package.json's `main` and `exports` now
+# point here, so Node resolves @vivasvana/db to compiled JavaScript instead
+# of the original .ts source (which production Node can't execute).
+COPY --from=build --chown=app:app /repo/packages/db/dist ./packages/db/dist
 COPY --from=build --chown=app:app /repo/packages/config/package.json ./packages/config/package.json
 
 USER app

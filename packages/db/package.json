@@ -3,13 +3,24 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./types": "./src/types.ts"
+    ".": {
+      "// dev": "source-on-condition — tsx + Vitest + Next dev enable --conditions=development",
+      "// prod": "compiled .js for plain Node runtime in the API container",
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "development": "./src/types.ts",
+      "default": "./dist/types.js"
+    }
   },
   "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.build.json",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
