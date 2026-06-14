@@ -159,13 +159,29 @@ jobs:
       - name: Deploy
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
 
+  # See deploy-qa.yml — same trick needed to give the reusable smoke
+  # workflow access to env-scoped vars.
+  collect-urls:
+    name: Resolve prod URLs
+    needs: deploy-web
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      web_url: ${{ steps.urls.outputs.web_url }}
+      api_url: ${{ steps.urls.outputs.api_url }}
+    steps:
+      - id: urls
+        run: |
+          echo "web_url=${{ vars.PROD_WEB_URL }}" >> "$GITHUB_OUTPUT"
+          echo "api_url=${{ vars.PROD_API_URL }}" >> "$GITHUB_OUTPUT"
+
   smoke:
     name: Smoke tests
-    needs: deploy-web
+    needs: collect-urls
     uses: ./.github/workflows/_smoke.yml
     with:
-      web_url: ${{ vars.PROD_WEB_URL }}
-      api_url: ${{ vars.PROD_API_URL }}
+      web_url: ${{ needs.collect-urls.outputs.web_url }}
+      api_url: ${{ needs.collect-urls.outputs.api_url }}
 
   release-tag:
     name: Tag release
@@ -191,7 +207,7 @@ jobs:
 
   notify-failure:
     name: Mark deploy failed
-    needs: [migrate, deploy-api, deploy-web, smoke]
+    needs: [migrate, deploy-api, deploy-web, collect-urls, smoke]
     if: failure()
     runs-on: ubuntu-latest
     steps:
