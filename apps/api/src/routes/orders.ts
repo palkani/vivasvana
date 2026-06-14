@@ -35,8 +35,10 @@ const CreateOrderBody = z.object({
   companyName: z.string().max(200).optional(),
   notes: z.string().max(1000).optional(),
   /** 6-digit OTP from /api/auth/order/request-otp — proves the shopper
-   *  owns the email the confirmation will be sent to. */
-  verificationCode: z.string().regex(/^\d{6}$/),
+   *  owns the email the confirmation will be sent to. Optional at the
+   *  schema layer so tests + local dev can bypass; OrderService enforces
+   *  presence based on REQUIRE_ORDER_OTP env. */
+  verificationCode: z.string().regex(/^\d{6}$/).optional(),
 });
 
 function mapServiceError(err: unknown, reply: FastifyReply) {

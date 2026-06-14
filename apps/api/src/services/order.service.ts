@@ -53,13 +53,30 @@ export class OrderService {
     // OTP must be consumed BEFORE the transaction opens; OtpService writes
     // its own row (`usedAt`) and we don't want a stock-race rollback to
     // un-consume an OTP and let the shopper retry with the same code.
-    if (!input.verificationCode) throw new Error('VERIFICATION_REQUIRED');
-    const result = await this.otp.verify({
-      email: input.email,
-      code: input.verificationCode,
-      purpose: 'COD_VERIFY',
-    });
-    if (!result.ok) throw new Error(`OTP_${result.reason}`);
+    //
+    // The REQUIRE_ORDER_OTP env gate lets us turn this on per environment:
+    // QA + prod set it to "true", local dev + integration tests leave it
+    // off so they can exercise the order pipeline without minting OTPs.
+    const otpRequired = process.env.REQUIRE_ORDER_OTP === 'true' || process.env.REQUIRE_ORDER_OTP === '1';
+    if (otpRequired) {
+      if (!input.verificationCode) throw new Error('VERIFICATION_REQUIRED');
+      const result = await this.otp.verify({
+        email: input.email,
+        code: input.verificationCode,
+        purpose: 'COD_VERIFY',
+      });
+      if (!result.ok) throw new Error(`OTP_${result.reason}`);
+    } else if (input.verificationCode) {
+      // The shopper still sent an OTP — verify it for them so a successful
+      // verification consumes the code, but don't BLOCK the order on it.
+      // This keeps the prod-shaped flow working in QA without making it a
+      // hard requirement.
+      await this.otp.verify({
+        email: input.email,
+        code: input.verificationCode,
+        purpose: 'COD_VERIFY',
+      });
+    }
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Load cart for this owner

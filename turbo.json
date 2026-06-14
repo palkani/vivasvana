@@ -38,7 +38,19 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "outputs": ["coverage/**"],
+      "env": [
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "REDIS_URL",
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_JWT_SECRET",
+        "JWT_SECRET",
+        "API_URL",
+        "NEXT_PUBLIC_*"
+      ]
     },
     "clean": {
       "cache": false

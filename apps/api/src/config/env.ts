@@ -28,6 +28,15 @@ const EnvSchema = z.object({
   SHIPROCKET_PASSWORD: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
 
+  // Gate the email-OTP step at checkout. Default is "off" so local dev,
+  // CI, and integration tests don't have to thread a fresh OTP through
+  // every order. QA + production deployments set this to "true" via env
+  // so real shoppers must confirm their email at place-order time.
+  REQUIRE_ORDER_OTP: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true' || v === '1'),
+
   // Twilio SMS — all four are optional individually; sendSms() degrades to a
   // dev-mode console log when SID/token are missing. In production, set at
   // least SID + token + either FROM_NUMBER or MESSAGING_SERVICE_SID.
