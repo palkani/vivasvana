@@ -12,6 +12,11 @@ concurrency:
 
 env:
   TURBO_TELEMETRY_DISABLED: 1
+  # Opt into Node.js 24 for the action runtime now — GitHub deprecates
+  # Node 20-based actions on 2026-06-16 and forcibly switches the default
+  # then. Setting this here silences the deprecation warning and confirms
+  # checkout/setup-node/action-setup work under Node 24 ahead of the cutoff.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   ci:

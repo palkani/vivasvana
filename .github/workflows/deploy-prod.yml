@@ -42,6 +42,10 @@ concurrency:
 
 env:
   TURBO_TELEMETRY_DISABLED: 1
+  # See ci.yml for rationale — opt into Node 24 ahead of GitHub's
+  # 2026-06-16 cutoff so the deprecation warnings stop and we exercise
+  # the new runtime before it becomes mandatory.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   wait-for-ci:
