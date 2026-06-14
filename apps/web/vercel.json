@@ -1,18 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
 
-  "// Root Directory": "Vercel project's Root Directory MUST be set to `apps/web` in the dashboard (Project → Settings → General → Root Directory). With that set, the working directory for these commands is apps/web, but pnpm install still finds the workspace from the repo root via the lockfile.",
+  "// Root Directory": "Project → Settings → General → Root Directory MUST be set to `apps/web`. With that set, the commands below run from apps/web; we `cd ../..` to reach the workspace root only for the install step.",
 
-  "// install": "Frozen lockfile so a Vercel cache miss can't silently install a different dep version than CI did. `cd ../..` because Vercel runs the install command from the Root Directory (apps/web) but pnpm needs to run at the workspace root so it resolves all packages, then writes a flat node_modules layout that Next.js's build can read.",
-  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "// install": "Walk up to the repo root for the workspace install (pnpm needs to see pnpm-workspace.yaml), then build @vivasvana/db so its dist/ exists by the time Next.js compiles. Using `cd ../..` keeps Vercel's per-step cwd reset behaviour intact — each command starts in apps/web.",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @vivasvana/db build",
 
-  "// build": "Build @vivasvana/web AND all its upstream dependencies (config, db). Run from the repo root so turbo can see every workspace package.",
-  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@vivasvana/web...",
+  "// build": "Don't override — let Vercel run `next build` itself. Wrapping it in `pnpm turbo` hid the Next.js build from Vercel's framework-aware output discovery, so it couldn't find .next/ after the build finished.",
 
   "framework": "nextjs",
-
-  "// outputDirectory": "Relative to the Root Directory (apps/web), so .next IS the build output (not apps/web/.next).",
-  "outputDirectory": ".next",
 
   "// ignoreCommand": "Skip rebuild if neither apps/web nor packages/* changed. `cd ../..` to run git from the repo root. Exit 0 = skip, Exit 1 = build.",
   "ignoreCommand": "cd ../.. && git diff --quiet HEAD^ HEAD -- apps/web packages || exit 1"
