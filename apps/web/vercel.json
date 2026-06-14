@@ -1,18 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-
-  "// Root Directory": "Project → Settings → General → Root Directory MUST be set to `apps/web`. With that set, the commands below run from apps/web; we `cd ../..` to reach the workspace root only for the install step.",
-
-  "// install": "Walk up to the repo root for the workspace install (pnpm needs to see pnpm-workspace.yaml), then build @vivasvana/db so its dist/ exists by the time Next.js compiles. Using `cd ../..` keeps Vercel's per-step cwd reset behaviour intact — each command starts in apps/web.",
   "installCommand": "cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @vivasvana/db build",
-
-  "// build": "Don't override — let Vercel run `next build` itself. Wrapping it in `pnpm turbo` hid the Next.js build from Vercel's framework-aware output discovery, so it couldn't find .next/ after the build finished.",
-
   "framework": "nextjs",
-
-  "// outputDirectory": "Explicit so Vercel doesn't fall back to looking for `public/` when its framework auto-detection gets confused by the monorepo install dance. Relative to the Root Directory (apps/web).",
   "outputDirectory": ".next",
-
-  "// ignoreCommand": "Skip rebuild if neither apps/web nor packages/* changed. `cd ../..` to run git from the repo root. Exit 0 = skip, Exit 1 = build.",
   "ignoreCommand": "cd ../.. && git diff --quiet HEAD^ HEAD -- apps/web packages || exit 1"
 }
