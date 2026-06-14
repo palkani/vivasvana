@@ -37,9 +37,9 @@ export default async function AccountLayout({ children }: { children: React.Reac
 
   return (
     <div className="container py-10">
-      <div className="grid gap-8 md:grid-cols-[220px_1fr]">
+      <div className="grid gap-8 md:grid-cols-[220px_minmax(0,1fr)]">
         <AccountSidebar email={user.email ?? ''} />
-        <div>{children}</div>
+        <div className="min-w-0">{children}</div>
       </div>
     </div>
   );

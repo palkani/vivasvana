@@ -47,7 +47,9 @@ function mapServiceError(err: unknown, reply: import('fastify').FastifyReply) {
   if (err instanceof Error) {
     switch (err.message) {
       case 'PRODUCT_NOT_AVAILABLE':
-        return reply.notFound('Product not available');
+        // Includes deleted, archived, AND draft products. Spelling it out
+        // saves admins debugging "why can't I add my own draft?".
+        return reply.notFound('This product is not available — it may be a draft, archived, or removed');
       case 'VARIANT_NOT_FOUND':
         return reply.notFound('Variant not found');
       case 'INSUFFICIENT_STOCK':

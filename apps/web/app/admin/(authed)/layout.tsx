@@ -24,9 +24,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (ADMIN_AUTH_DISABLED) {
     return (
       <AdminMeProvider>
-        <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_1fr]">
+        <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)]">
           <AdminSidebar userEmail="dev@local (auth disabled)" devMode />
-          <main className="bg-muted/30">
+          <main className="min-w-0 bg-muted/30">
             <DevAuthBanner />
             <div className="p-4 md:p-8">{children}</div>
           </main>
@@ -57,7 +57,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <AdminMeProvider>
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_1fr]">
         <AdminSidebar userEmail={user.email ?? ''} />
-        <main className="bg-muted/30 p-4 md:p-8">{children}</main>
+        <main className="min-w-0 bg-muted/30 p-4 md:p-8">{children}</main>
       </div>
     </AdminMeProvider>
   );

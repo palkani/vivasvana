@@ -33,6 +33,9 @@ const CreateOrderBody = z.object({
   gstin: z.string().regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/).optional(),
   companyName: z.string().max(200).optional(),
   notes: z.string().max(1000).optional(),
+  /** 6-digit OTP from /api/auth/order/request-otp — proves the shopper
+   *  owns the email the confirmation will be sent to. */
+  verificationCode: z.string().regex(/^\d{6}$/),
 });
 
 function mapServiceError(err: unknown, reply: FastifyReply) {
@@ -49,9 +52,25 @@ function mapServiceError(err: unknown, reply: FastifyReply) {
       const detail = err.message.split(':').slice(1).join(':').trim();
       return reply.badRequest(detail || 'Discount code is no longer valid');
     }
+    if (err.message === 'DISCOUNT_USAGE_LIMIT_REACHED') {
+      return reply.conflict('This discount code just reached its usage limit. Please try another.');
+    }
     if (err.message === 'ORDER_NOT_FOUND') return reply.notFound('Order not found');
     if (err.message === 'ORDER_NOT_PENDING') {
       return reply.conflict('Order can no longer be cancelled');
+    }
+    // Verification OTP failures from OrderService.createFromCart.
+    if (err.message === 'VERIFICATION_REQUIRED' || err.message === 'OTP_NOT_FOUND') {
+      return reply.badRequest('Please request a confirmation code first.');
+    }
+    if (err.message === 'OTP_EXPIRED') {
+      return reply.badRequest('Your confirmation code expired. Please request a new one.');
+    }
+    if (err.message === 'OTP_WRONG_CODE') {
+      return reply.badRequest('That confirmation code is incorrect.');
+    }
+    if (err.message === 'OTP_TOO_MANY_ATTEMPTS') {
+      return reply.badRequest('Too many failed attempts. Please request a new code.');
     }
   }
   throw err;

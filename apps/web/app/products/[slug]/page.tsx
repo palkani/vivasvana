@@ -71,9 +71,13 @@ export default async function ProductPage({ params }: PageProps) {
 
   return (
     <>
+      {/* JSON-LD: escape `<` so a `</script>` inside any product field can't
+          break out of the script tag. JSON.stringify alone does NOT do this. */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c'),
+        }}
       />
 
       <div className="container py-8 md:py-12">

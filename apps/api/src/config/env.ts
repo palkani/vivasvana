@@ -28,6 +28,14 @@ const EnvSchema = z.object({
   SHIPROCKET_PASSWORD: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
 
+  // Twilio SMS — all four are optional individually; sendSms() degrades to a
+  // dev-mode console log when SID/token are missing. In production, set at
+  // least SID + token + either FROM_NUMBER or MESSAGING_SERVICE_SID.
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_FROM_NUMBER: z.string().optional(),
+  TWILIO_MESSAGING_SERVICE_SID: z.string().optional(),
+
   // Dev-only admin bypass — IGNORED when NODE_ENV=production (see auth plugin).
   ADMIN_AUTH_DISABLED: z
     .string()

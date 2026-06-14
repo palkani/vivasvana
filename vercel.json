@@ -1,8 +1,16 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "pnpm --filter @vivasvana/db generate && pnpm --filter @vivasvana/web build",
+
+  "// install": "Frozen lockfile so a Vercel cache miss can't silently install a different dep version than CI did. If you ever see a 'lockfile out of date' error, run `pnpm install` locally and commit the lockfile.",
+  "installCommand": "pnpm install --frozen-lockfile",
+
+  "// build": "Turbo's filter syntax: build @vivasvana/web AND all its upstream dependencies (config, db). Gets us turbo's remote cache for the @vivasvana/db generate step.",
+  "buildCommand": "pnpm turbo run build --filter=@vivasvana/web...",
+
   "devCommand": "pnpm --filter @vivasvana/web dev",
-  "installCommand": "pnpm install --no-frozen-lockfile",
   "framework": "nextjs",
-  "outputDirectory": "apps/web/.next"
+  "outputDirectory": "apps/web/.next",
+
+  "// ignoreCommand": "Skip rebuild if neither apps/web nor packages/* changed. Slashes the deploy queue when you push API-only changes. Exit 0 = skip, Exit 1 = build.",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- apps/web packages || exit 1"
 }

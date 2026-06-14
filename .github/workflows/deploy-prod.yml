@@ -1,0 +1,209 @@
+name: Deploy → Production
+
+# Triggers on every push to `main`. Same shape as deploy-qa.yml but:
+#   - References the `production` GitHub Environment, so its secrets are
+#     scoped separately AND it can require manual reviewer approval before
+#     ANY job runs (Settings → Environments → production → "Required
+#     reviewers"). Configure that — you do NOT want pushes to main
+#     auto-deploying without a human eye.
+#   - Workflow_dispatch supports a `tag` input so an operator can
+#     re-deploy a known-good past commit during incident response.
+#   - Includes a "create release" step on success so the prod history is
+#     visible in the GitHub Releases tab.
+#
+# --- REQUIRED GITHUB SECRETS (scoped to the `production` environment) ----
+#
+# DATABASE_URL                  prod pooler URL
+# DIRECT_URL                    prod direct URL
+# VERCEL_TOKEN
+# VERCEL_ORG_ID
+# VERCEL_PROJECT_ID             prod Vercel project (separate from QA)
+# RAILWAY_TOKEN                 prod Railway project token
+# RAILWAY_SERVICE_ID            prod Railway service id
+#
+# --- REQUIRED ENVIRONMENT VARIABLES (Settings → Environments → production)
+#
+# PROD_WEB_URL                  https://vivasvana.com
+# PROD_API_URL                  https://api.vivasvana.com
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to deploy (default: main HEAD). Useful for hotfix rollback.'
+        type: string
+        default: 'main'
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+
+jobs:
+  wait-for-ci:
+    name: Wait for CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CI workflow to succeed
+        uses: lewagon/wait-on-check-action@v1.3.4
+        with:
+          ref: ${{ github.event.inputs.ref || github.sha }}
+          check-name: 'Lint, typecheck, test'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 15
+
+  migrate:
+    name: Apply migrations (Production Supabase)
+    needs: wait-for-ci
+    runs-on: ubuntu-latest
+    # The `production` environment gate — GitHub will pause this job and
+    # require an approval click before it runs IF the environment is
+    # configured with required reviewers. Highly recommended.
+    environment: production
+    timeout-minutes: 5
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DIRECT_URL: ${{ secrets.DIRECT_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Show pending migrations (audit trail)
+        # Read-only summary into the job log so reviewers can see exactly
+        # what's about to be applied. `migrate status` exits non-zero if
+        # the DB is ahead of the repo — which would be a serious drift
+        # signal, so we let it fail the job.
+        run: pnpm --filter @vivasvana/db exec prisma migrate status
+      - name: Apply pending migrations
+        run: pnpm --filter @vivasvana/db run migrate:deploy
+
+  deploy-api:
+    name: Deploy API → Railway (Production)
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+      - name: Install Railway CLI
+        run: |
+          curl -fsSL https://railway.com/install.sh | sh
+          echo "$HOME/.railway/bin" >> "$GITHUB_PATH"
+      - name: Deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up \
+            --service "${{ secrets.RAILWAY_SERVICE_ID }}" \
+            --detach
+
+      - name: Poll /health until healthy
+        run: |
+          for i in $(seq 1 24); do  # 24 × 5 s = 2 min — prod sometimes
+                                    # boots slower under load
+            code=$(curl -sS -o /dev/null -w "%{http_code}" "${{ vars.PROD_API_URL }}/health" || true)
+            if [ "$code" = "200" ]; then
+              echo "::notice::API healthy after ${i}× 5s polls"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::API /health never returned 200 within 2 min"
+          exit 1
+
+  deploy-web:
+    name: Deploy Web → Vercel (Production)
+    needs: deploy-api
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+      - name: Pull env from Vercel (production scope)
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Build
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+  smoke:
+    name: Smoke tests
+    needs: deploy-web
+    uses: ./.github/workflows/_smoke.yml
+    with:
+      web_url: ${{ vars.PROD_WEB_URL }}
+      api_url: ${{ vars.PROD_API_URL }}
+
+  release-tag:
+    name: Tag release
+    needs: smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
+          fetch-depth: 0
+      - name: Create release tag (short SHA + timestamp)
+        run: |
+          # Tag format: prod-2026.06.14-abc1234 — sortable, recognizable,
+          # uses the deployed SHA so rollbacks reference an exact build.
+          DATE=$(date -u +'%Y.%m.%d')
+          SHORT=$(git rev-parse --short HEAD)
+          TAG="prod-${DATE}-${SHORT}"
+          git tag "$TAG"
+          git push origin "$TAG"
+          echo "::notice::Tagged $TAG"
+
+  notify-failure:
+    name: Mark deploy failed
+    needs: [migrate, deploy-api, deploy-web, smoke]
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Surface failure summary
+        run: |
+          {
+            echo "## 🚨 Production deploy failed"
+            echo "Commit: \`${{ github.event.inputs.ref || github.sha }}\`"
+            echo "Author: ${{ github.actor }}"
+            echo ""
+            echo "### Next steps"
+            echo "1. Open Vercel → roll back to the previous deployment if web is broken"
+            echo "2. Open Railway → redeploy the previous build if API is broken"
+            echo "3. If a migration applied but the deploy failed, the DB is now ahead"
+            echo "   of the deployed code — consider rolling FORWARD with a hotfix"
+            echo "   rather than reverting migrations"
+          } >> "$GITHUB_STEP_SUMMARY"

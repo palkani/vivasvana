@@ -24,7 +24,10 @@ next-env.d.ts
 .env.production
 .env.test
 .env.*.local
+.env.*.bak
+.env.supabase
 !.env.example
+!.env.supabase.example
 
 # Logs
 *.log
@@ -68,3 +71,6 @@ supabase/.temp
 
 # Vercel
 .vercel
+
+# Claude Code workspace config
+.claude/

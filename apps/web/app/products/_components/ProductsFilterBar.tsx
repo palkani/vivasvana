@@ -30,8 +30,6 @@ export function ProductsFilterBar() {
   }
 
   const currentSort = searchParams.get('sort') ?? 'newest';
-  const isVegan = searchParams.get('isVegan') === 'true';
-  const isGlutenFree = searchParams.get('isGlutenFree') === 'true';
 
   return (
     <div
@@ -51,23 +49,6 @@ export function ProductsFilterBar() {
             </option>
           ))}
         </select>
-      </label>
-
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={isVegan}
-          onChange={(e) => setParam('isVegan', e.target.checked ? 'true' : null)}
-        />
-        Vegan
-      </label>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={isGlutenFree}
-          onChange={(e) => setParam('isGlutenFree', e.target.checked ? 'true' : null)}
-        />
-        Gluten-free
       </label>
 
       <div className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">

@@ -26,7 +26,11 @@ const EMPTY_INPUT = {
   taxRate: '5.00',
   stock: 0,
   weight: 0,
-  status: 'DRAFT' as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
+  // Default to PUBLISHED so a new product is immediately visible + addable to
+  // cart, matching Shopify's "Active" default. Admins can flip to DRAFT before
+  // saving if they want to stage. DRAFT products 404 on /products/[slug] and
+  // are rejected by the cart route ("Product not available").
+  status: 'PUBLISHED' as 'DRAFT' | 'PUBLISHED' | 'ARCHIVED',
   isVegan: true,
   isGlutenFree: false,
   ingredients: '',

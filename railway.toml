@@ -1,0 +1,36 @@
+# Railway build config for the Fastify API service.
+#
+# Lives at the monorepo root because Railway treats the repo root as the
+# build context — pnpm needs to see pnpm-workspace.yaml to wire up the
+# @vivasvana/* workspace packages. The API service is selected via
+# RAILWAY_SERVICE_ID in the deploy workflow.
+#
+# Nixpacks (Railway's default builder) auto-detects pnpm and Node from
+# package.json + .nvmrc; we override the build/start commands so the
+# Prisma client is generated and only the API package's build is run.
+
+[build]
+builder = "nixpacks"
+buildCommand = """\
+pnpm install --frozen-lockfile && \
+pnpm --filter @vivasvana/db generate && \
+pnpm turbo run build --filter=@vivasvana/api...\
+"""
+
+[deploy]
+# start:prod skips the `--env-file=.env` flag the dev script uses;
+# Railway injects env vars into process.env directly so the file
+# wouldn't exist on disk and Node would crash on boot.
+startCommand = "pnpm --filter @vivasvana/api start:prod"
+
+# Restart if the process exits with a non-zero code, but cap retries so a
+# crash-loop doesn't burn CPU credits forever.
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5
+
+# Railway's load balancer probes this path before flipping traffic to a
+# new deployment. The Fastify /health route always returns 200 once the
+# Prisma client has connected — exactly what we want as a readiness
+# signal.
+healthcheckPath = "/health"
+healthcheckTimeout = 30

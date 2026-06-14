@@ -17,7 +17,7 @@ export function TestimonialsRow({ testimonials }: { testimonials: Testimonial[] 
       <div className="container py-16">
         <header className="mx-auto max-w-2xl text-center">
           <h2 className="font-serif text-3xl font-semibold tracking-tight text-brand-900 md:text-4xl">
-            Loved by thousands of Indian families
+            Loved by thousands of families
           </h2>
           <p className="mt-3 text-muted-foreground">
             Real reviews from busy parents, athletes and seniors who&rsquo;ve made millets

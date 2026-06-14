@@ -99,12 +99,27 @@ export class DiscountService {
     return '0.00';
   }
 
-  /** Increment usedCount on a discount. Call from order-create transaction. */
+  /**
+   * Atomically claim one use of a discount inside an order transaction.
+   *
+   * Atomicity matters: validate() reads maxUses outside the order tx, so two
+   * orders racing on the last allowed redemption could both pass the pre-check.
+   * Here we increment usedCount only if it's still strictly less than maxUses
+   * (or maxUses is null = unlimited) in a single guarded UPDATE — the second
+   * racer's updateMany returns count=0 and we throw, rolling back the order.
+   */
   async recordUsage(tx: Prisma.TransactionClient, code: string): Promise<void> {
-    await tx.discount.update({
-      where: { code: code.toUpperCase() },
-      data: { usedCount: { increment: 1 } },
-    });
+    const upper = code.toUpperCase();
+    const result = await tx.$executeRaw`
+      UPDATE discounts
+         SET used_count = used_count + 1,
+             updated_at = NOW()
+       WHERE code = ${upper}
+         AND (max_uses IS NULL OR used_count < max_uses)
+    `;
+    if (result === 0) {
+      throw new Error('DISCOUNT_USAGE_LIMIT_REACHED');
+    }
   }
 
   // ============================================================================

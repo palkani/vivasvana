@@ -15,9 +15,9 @@
     "migrate:deploy": "prisma migrate deploy",
     "migrate:reset": "prisma migrate reset --force",
     "reset": "prisma migrate reset --force && pnpm seed",
-    "seed": "tsx prisma/seed.ts",
-    "promote-admin": "tsx scripts/promote-admin.ts",
-    "setup-storage": "tsx scripts/setup-storage.ts",
+    "seed": "tsx --env-file=.env prisma/seed.ts",
+    "promote-admin": "tsx --env-file=.env scripts/promote-admin.ts",
+    "setup-storage": "tsx --env-file=.env scripts/setup-storage.ts",
     "studio": "prisma studio",
     "format": "prisma format",
     "lint": "echo 'no-op'",
@@ -36,6 +36,6 @@
     "@types/node": "^20.14.0"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx --env-file=.env prisma/seed.ts"
   }
 }

@@ -1,0 +1,78 @@
+name: Smoke tests (reusable)
+
+# Reusable smoke-test job called by deploy-qa.yml and deploy-prod.yml after
+# they finish promoting code. Hits the live URLs and asserts the basic
+# shopper + API paths are working. Keep it under 60 seconds wall-clock —
+# the goal is "did the deploy break anything obvious", not full coverage.
+
+on:
+  workflow_call:
+    inputs:
+      web_url:
+        description: Storefront base URL (e.g. https://qa.vivasvana.com)
+        required: true
+        type: string
+      api_url:
+        description: API base URL (e.g. https://api-qa.vivasvana.com)
+        required: true
+        type: string
+
+jobs:
+  smoke:
+    name: Live smoke probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: API health
+        run: |
+          set -e
+          code=$(curl -sS -o /tmp/health -w "%{http_code}" "${{ inputs.api_url }}/health")
+          [ "$code" = "200" ] || { echo "::error::API /health → $code"; cat /tmp/health; exit 1; }
+          echo "::notice::API /health → 200"
+
+      - name: API catalog returns ≥ 1 product
+        run: |
+          set -e
+          curl -sS "${{ inputs.api_url }}/api/products" -o /tmp/products
+          total=$(jq -r '.total // 0' /tmp/products)
+          if [ "${total:-0}" -lt 1 ]; then
+            echo "::error::Expected at least 1 product, got $total"
+            cat /tmp/products
+            exit 1
+          fi
+          echo "::notice::Catalog has $total products"
+
+      - name: API product detail loads
+        run: |
+          set -e
+          code=$(curl -sS -o /tmp/p -w "%{http_code}" "${{ inputs.api_url }}/api/products/nutri-millet")
+          [ "$code" = "200" ] || { echo "::error::Product detail → $code"; cat /tmp/p; exit 1; }
+          jq -e '.id and .slug and (.images | length > 0)' /tmp/p > /dev/null \
+            || { echo "::error::Product payload missing required fields"; cat /tmp/p; exit 1; }
+          echo "::notice::Product detail OK"
+
+      - name: API PIN lookup
+        run: |
+          set -e
+          curl -sS "${{ inputs.api_url }}/api/pincode/560001" -o /tmp/pin
+          state=$(jq -r '.stateCode // ""' /tmp/pin)
+          [ "$state" = "KA" ] || { echo "::error::PIN 560001 → $state, expected KA"; cat /tmp/pin; exit 1; }
+          echo "::notice::PIN lookup OK"
+
+      - name: Web home renders
+        run: |
+          set -e
+          code=$(curl -sS -L -o /tmp/home -w "%{http_code}" "${{ inputs.web_url }}/")
+          [ "$code" = "200" ] || { echo "::error::Web / → $code"; exit 1; }
+          # Sanity check the brand mark is on the page — a blank deploy
+          # usually still returns 200 but with empty HTML.
+          grep -q -i "vivasvana" /tmp/home \
+            || { echo "::error::Home page HTML missing 'Vivasvana'"; head -100 /tmp/home; exit 1; }
+          echo "::notice::Storefront home OK"
+
+      - name: Web products page renders
+        run: |
+          set -e
+          code=$(curl -sS -L -o /tmp/products_html -w "%{http_code}" "${{ inputs.web_url }}/products")
+          [ "$code" = "200" ] || { echo "::error::/products → $code"; exit 1; }
+          echo "::notice::Products page OK"

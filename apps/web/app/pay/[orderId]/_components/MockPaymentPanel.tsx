@@ -77,7 +77,7 @@ export function MockPaymentPanel({ order }: Props) {
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-[1fr_280px]">
+    <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_280px]">
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Mock payment gateway</CardTitle>

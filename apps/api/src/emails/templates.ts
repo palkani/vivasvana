@@ -68,6 +68,46 @@ export function renderWelcome(data: { name?: string | null; email: string }) {
   };
 }
 
+// ---------- One-time codes -------------------------------------------------
+
+export type OtpKind = 'signup' | 'order';
+
+/**
+ * One-time passcode email. The 6-digit code is rendered in a giant
+ * tracking-wide span so the shopper can read it from a notification
+ * preview without opening the mail client.
+ */
+export function renderOtp(data: {
+  code: string;
+  kind: OtpKind;
+  expiresInMinutes: number;
+}) {
+  const isSignup = data.kind === 'signup';
+  const subject = isSignup
+    ? `${data.code} is your Vivasvana sign-up code`
+    : `${data.code} is your Vivasvana order confirmation code`;
+  const heading = isSignup ? 'Verify your email' : 'Confirm your order';
+  const intro = isSignup
+    ? 'Enter this 6-digit code on the sign-up page to finish creating your account.'
+    : 'Enter this 6-digit code on the checkout page to confirm and place your order.';
+  const body = `
+    <h1>${heading}</h1>
+    <p style="margin: 4px 0 24px;">${intro}</p>
+    <div style="text-align:center;background:#fbf7ee;border:1px solid #ead8a8;border-radius:12px;padding:24px;margin: 0 0 20px;">
+      <div style="font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace; font-size: 36px; letter-spacing: 8px; font-weight: 700; color: #82532a;">
+        ${escape(data.code)}
+      </div>
+      <p class="muted" style="margin:12px 0 0;">Expires in ${data.expiresInMinutes} minutes</p>
+    </div>
+    <p class="muted">If you didn&rsquo;t request this code, ignore this email — your account is safe.</p>
+  `;
+  return {
+    subject,
+    html: layout({ title: subject, preheader: `Your code: ${data.code}`, body }),
+    text: `${heading}\n\nYour code is: ${data.code}\nExpires in ${data.expiresInMinutes} minutes.\n\nIf you didn’t request this, ignore this email.`,
+  };
+}
+
 // ---------- Order confirmation ---------------------------------------------
 
 type OrderWithRelations = Order & {

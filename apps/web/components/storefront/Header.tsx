@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import { ShoppingBag, Search, User } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { SunMark } from './SunMark';
+import { HeaderActions } from './HeaderActions';
 
 const nav = [
   { href: '/', label: 'Home' },
@@ -47,21 +46,7 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" aria-label="Search">
-            <Search className="h-5 w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" aria-label="Account" asChild>
-            <Link href="/account">
-              <User className="h-5 w-5" />
-            </Link>
-          </Button>
-          <Button variant="ghost" size="icon" aria-label="Cart" asChild>
-            <Link href="/cart">
-              <ShoppingBag className="h-5 w-5" />
-            </Link>
-          </Button>
-        </div>
+        <HeaderActions />
       </div>
     </header>
   );

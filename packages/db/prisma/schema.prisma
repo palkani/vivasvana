@@ -335,6 +335,9 @@ model Order {
   @@index([status])
   @@index([paymentStatus])
   @@index([placedAt])
+  // Admin list filters by status and sorts by placedAt-desc — composite
+  // serves the common "show me all PACKED orders newest first" query.
+  @@index([status, placedAt])
   @@map("orders")
 }
 
@@ -543,6 +546,8 @@ model Testimonial {
   createdAt DateTime      @default(now()) @map("created_at")
   updatedAt DateTime      @updatedAt @map("updated_at")
 
+  // Homepage fetches PUBLISHED testimonials ordered by sortOrder.
+  @@index([status, sortOrder])
   @@map("testimonials")
 }
 

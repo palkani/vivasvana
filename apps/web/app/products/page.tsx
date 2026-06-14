@@ -14,8 +14,6 @@ interface PageProps {
     sort?: string;
     minPrice?: string;
     maxPrice?: string;
-    isVegan?: string;
-    isGlutenFree?: string;
     page?: string;
   }>;
 }
@@ -31,8 +29,6 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   const params = new URLSearchParams({ sort, page: String(page), pageSize: '12' });
   if (sp.minPrice) params.set('minPrice', sp.minPrice);
   if (sp.maxPrice) params.set('maxPrice', sp.maxPrice);
-  if (sp.isVegan === 'true') params.set('isVegan', 'true');
-  if (sp.isGlutenFree === 'true') params.set('isGlutenFree', 'true');
 
   let data: ProductListResponse;
   try {

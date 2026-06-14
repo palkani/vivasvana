@@ -39,6 +39,7 @@ import orderRoutes from './routes/orders.js';
 import paymentRoutes from './routes/payments.js';
 import testimonialRoutes from './routes/testimonials.js';
 import contactRoutes from './routes/contact.js';
+import authRoutes from './routes/auth.js';
 
 export async function buildApp(opts: FastifyServerOptions = {}) {
   const app = Fastify({
@@ -117,6 +118,7 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
   await app.register(paymentRoutes);
   await app.register(testimonialRoutes);
   await app.register(contactRoutes);
+  await app.register(authRoutes);
   // future: blog…
 
   return app;

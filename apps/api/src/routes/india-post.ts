@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { lookupPincode } from '../integrations/india-post.js';
+import { lookupPincode, searchCitiesByName } from '../integrations/india-post.js';
 
 export default async function indiaPostRoutes(app: FastifyInstance) {
   app.get(
@@ -16,6 +16,25 @@ export default async function indiaPostRoutes(app: FastifyInstance) {
       const result = await lookupPincode(req.params.pin, app.redis);
       if (!result) return reply.notFound('PIN not found');
       return result;
+    },
+  );
+
+  app.get(
+    '/api/cities/search',
+    {
+      schema: {
+        tags: ['utils'],
+        summary:
+          'Typeahead search across India Post post-office directory ' +
+          '(~150k places). Grouped to one row per district + state.',
+        querystring: z.object({
+          q: z.string().min(2).max(60),
+        }),
+      },
+    },
+    async (req) => {
+      const hits = await searchCitiesByName(req.query.q, app.redis);
+      return { items: hits };
     },
   );
 }

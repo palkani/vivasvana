@@ -6,14 +6,13 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PincodeStatus } from '@/components/storefront/PincodeStatus';
-import { CitySelect } from '@/components/storefront/CitySelect';
+import { SmartPincodeInput } from '@/components/storefront/SmartPincodeInput';
+import { SmartCityInput } from '@/components/storefront/SmartCityInput';
 import { INDIA_STATES, stateName } from '@/lib/india-states';
 import { formatINR } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useCartStore, cartSubtotal } from '@/lib/cart-store';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
-import { usePincodeLookup } from '@/lib/use-pincode-lookup';
 import type { Cart, Address, Order, PaymentMethod } from '@/lib/types';
 import type { DiscountInfo } from '@/lib/discount';
 
@@ -60,15 +59,30 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
   const [discount, setDiscount] = useState<DiscountInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Two-stage place-order: first click requests an OTP, second click
+  // (with the code filled in) actually creates the order.
+  const [otpStage, setOtpStage] = useState<
+    | { kind: 'idle' }
+    | { kind: 'awaiting'; emailSent: string }
+  >({ kind: 'idle' });
+  const [orderOtp, setOrderOtp] = useState('');
+  const [otpInfo, setOtpInfo] = useState<string | null>(null);
 
-  // PIN → city/state auto-fill. Always overrides when a NEW PIN resolves —
-  // PIN is the source of truth for city/state; manual edits can happen after.
-  const pinLookupState = usePincodeLookup(
-    useSavedId ? '' : shipping.pincode,
-    (r) => {
-      setShipping((prev) => ({ ...prev, city: r.city, state: r.stateCode }));
-    },
-  );
+  // PIN → city/state auto-fill is wired directly inside <SmartPincodeInput>
+  // via onResolved. We keep one bit of state to know if the shopper has
+  // manually typed a city, so we don't clobber their input on PIN re-resolve.
+  const [cityManuallyEdited, setCityManuallyEdited] = useState(false);
+
+  function applyPinResolution(r: { city: string; stateCode: string }) {
+    setShipping((prev) => ({
+      ...prev,
+      // Don't clobber a city the shopper deliberately typed (e.g. a colony
+      // name not in the post-office record). State is always trustworthy
+      // from PIN so we overwrite that unconditionally.
+      city: cityManuallyEdited && prev.city.trim() ? prev.city : r.city,
+      state: r.stateCode,
+    }));
+  }
 
   // restore discount applied on /cart
   useEffect(() => {
@@ -95,6 +109,9 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
       pincode: a.pincode,
     });
     setContactPhone((p) => p || a.phone);
+    // Saved addresses already have a deliberate city — treat it as manual
+    // so a future PIN re-resolve doesn't silently replace it.
+    setCityManuallyEdited(true);
   }, [useSavedId, savedAddresses]);
 
 
@@ -111,18 +128,55 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
     setShipping((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handlePlaceOrder(e: React.FormEvent) {
+  /**
+   * Stage 1 — the "Place order" button. Validates the form natively (via
+   * `<form required>` fields), then requests an OTP. We don't create the
+   * order yet — the next click does that, once the OTP is entered.
+   */
+  function handleRequestOrderOtp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-
+    setOtpInfo(null);
+    if (!contactEmail.trim()) {
+      setError('Please enter your email so we can send the confirmation code.');
+      return;
+    }
     startTransition(async () => {
       try {
-        // 1. Build access token if user is logged in (so userId attaches server-side)
+        const supabase = createSupabaseBrowserClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData.session?.access_token;
+        const res = await api.post<{ email: string; expiresAt: string }>(
+          '/api/auth/order/request-otp',
+          { email: contactEmail },
+          { accessToken },
+        );
+        setOtpStage({ kind: 'awaiting', emailSent: res.email });
+        setOtpInfo(`We sent a 6-digit code to ${res.email}. Enter it below to place the order.`);
+      } catch (e) {
+        const err = e as { payload?: { message?: string }; message?: string };
+        setError(err.payload?.message ?? err.message ?? 'Could not send verification code');
+      }
+    });
+  }
+
+  /**
+   * Stage 2 — confirm & place. Takes the OTP and runs the actual order
+   * create. The OTP is consumed server-side inside the order-create
+   * transaction so a leaked code can't be replayed.
+   */
+  function handleConfirmAndPlace() {
+    setError(null);
+    if (!/^\d{6}$/.test(orderOtp)) {
+      setError('Please enter the 6-digit code from your email.');
+      return;
+    }
+    startTransition(async () => {
+      try {
         const supabase = createSupabaseBrowserClient();
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
 
-        // 2. Create the order
         const order = await api.post<Order>(
           '/api/orders',
           {
@@ -140,11 +194,11 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
               country: 'IN',
             },
             discountCode: discount?.code,
+            verificationCode: orderOtp,
           },
           { accessToken },
         );
 
-        // 3. Clear cart state + discount + go to the right next step
         useCartStore.setState({ cart: { ...initialCart, items: [] } });
         try {
           localStorage.removeItem(DISCOUNT_STORAGE_KEY);
@@ -153,7 +207,6 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
         }
 
         if (order.paymentMethod === 'COD') {
-          // Confirm COD immediately and head to the success page
           await api.post(`/api/payments/cod-confirm/${order.id}`);
           router.push(
             `/orders/confirmed?orderNumber=${order.orderNumber}&email=${encodeURIComponent(order.email)}`,
@@ -161,7 +214,6 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
           return;
         }
 
-        // Otherwise: mock payment flow
         router.push(`/pay/${order.id}`);
       } catch (e) {
         const err = e as { payload?: { message?: string }; message?: string };
@@ -171,8 +223,11 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
   }
 
   return (
-    <form onSubmit={handlePlaceOrder} className="grid gap-8 lg:grid-cols-[1fr_360px]">
-      <div className="space-y-6">
+    <form
+      onSubmit={handleRequestOrderOtp}
+      className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]"
+    >
+      <div className="min-w-0 space-y-6">
         {/* Contact */}
         <Card>
           <CardHeader>
@@ -300,24 +355,30 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
               </label>
               <label className="space-y-1">
                 <span className="text-sm font-medium">PIN code *</span>
-                <Input
-                  required
-                  inputMode="numeric"
-                  pattern="[1-9][0-9]{5}"
-                  maxLength={6}
-                  value={shipping.pincode}
-                  onChange={(e) => setShip('pincode', e.target.value.replace(/\D/g, ''))}
-                  autoComplete="postal-code"
-                  placeholder="6-digit PIN"
+                <SmartPincodeInput
+                  value={useSavedId ? '' : shipping.pincode}
+                  onChange={(v) => setShip('pincode', v)}
+                  onResolved={applyPinResolution}
                 />
-                <PincodeStatus state={pinLookupState} />
               </label>
               <label className="space-y-1">
                 <span className="text-sm font-medium">City *</span>
-                <CitySelect
-                  stateCode={shipping.state}
+                <SmartCityInput
                   value={shipping.city}
-                  onChange={(v) => setShip('city', v)}
+                  stateCode={shipping.state}
+                  onSelect={({ city, stateCode }) => {
+                    // A picked city marks the field as manually edited so
+                    // any subsequent PIN re-resolve doesn't clobber it.
+                    setCityManuallyEdited(true);
+                    setShipping((prev) => ({
+                      ...prev,
+                      city,
+                      // If the shopper picks a known city we also lock in
+                      // its state (free for them). For free-text commits
+                      // (stateCode === null) we leave state untouched.
+                      state: stateCode ?? prev.state,
+                    }));
+                  }}
                 />
               </label>
               <label className="space-y-1 md:col-span-2">
@@ -457,12 +518,75 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
             <span className="tabular-nums">{formatINR(total)}</span>
           </div>
 
-          <Button type="submit" className="w-full" size="lg" disabled={pending}>
-            {pending ? 'Placing order…' : `Place order · ${formatINR(total)}`}
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            By placing this order you agree to our terms of service.
-          </p>
+          {otpStage.kind === 'idle' ? (
+            <>
+              <Button type="submit" className="w-full" size="lg" disabled={pending}>
+                {pending ? 'Sending code…' : `Place order · ${formatINR(total)}`}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                We&rsquo;ll email a 6-digit code to confirm this order. By placing
+                it you agree to our terms of service.
+              </p>
+            </>
+          ) : (
+            <div className="space-y-3 rounded-md border border-brand-200 bg-brand-50/40 p-3">
+              <p className="text-xs text-muted-foreground">
+                Code sent to{' '}
+                <span className="font-medium text-foreground">{otpStage.emailSent}</span>.
+                Check your inbox (and spam folder) for a 6-digit code from Vivasvana.
+              </p>
+              <Input
+                value={orderOtp}
+                onChange={(e) =>
+                  setOrderOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+                }
+                inputMode="numeric"
+                pattern="\d{6}"
+                maxLength={6}
+                autoComplete="one-time-code"
+                placeholder="6-digit code"
+                className="text-center text-lg tracking-[0.4em] tabular-nums"
+              />
+              {otpInfo && (
+                <p className="text-xs text-leaf-700">{otpInfo}</p>
+              )}
+              <Button
+                type="button"
+                onClick={handleConfirmAndPlace}
+                className="w-full"
+                size="lg"
+                disabled={pending || orderOtp.length !== 6}
+              >
+                {pending ? 'Confirming…' : `Confirm & place order · ${formatINR(total)}`}
+              </Button>
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOrderOtp('');
+                    setOtpInfo(null);
+                    // Re-trigger the form's submit handler to request a new code.
+                    handleRequestOrderOtp(new Event('submit') as unknown as React.FormEvent);
+                  }}
+                  disabled={pending}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Resend code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOtpStage({ kind: 'idle' });
+                    setOrderOtp('');
+                    setOtpInfo(null);
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Edit details
+                </button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </form>

@@ -26,7 +26,9 @@ const ProductInput = z.object({
   weight: z.coerce.number().min(0).optional(),
   stock: z.coerce.number().int().min(0).default(0),
   lowStockAt: z.coerce.number().int().min(0).default(10),
-  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).default('DRAFT'),
+  // Default PUBLISHED — matches the admin form's default + Shopify's "Active".
+  // A product saved without an explicit choice should be sellable.
+  status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).default('PUBLISHED'),
   isVegan: z.boolean().default(true),
   isGlutenFree: z.boolean().default(false),
   metaTitle: z.string().max(200).optional(),

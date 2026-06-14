@@ -4,11 +4,10 @@ import { useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { PincodeStatus } from '@/components/storefront/PincodeStatus';
-import { CitySelect } from '@/components/storefront/CitySelect';
+import { SmartPincodeInput } from '@/components/storefront/SmartPincodeInput';
+import { SmartCityInput } from '@/components/storefront/SmartCityInput';
 import { accountApi } from '@/lib/account-api';
 import { INDIA_STATES } from '@/lib/india-states';
-import { usePincodeLookup } from '@/lib/use-pincode-lookup';
 import type { Address } from '@/lib/types';
 
 interface Props {
@@ -33,10 +32,18 @@ export function AddressForm({ initial, onSaved, onCancel }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // PIN → city/state auto-fill (debounced, always overrides)
-  const pinLookupState = usePincodeLookup(form.pincode, (r) => {
-    setForm((prev) => ({ ...prev, city: r.city, state: r.stateCode }));
-  });
+  // PIN → city/state is handled by SmartPincodeInput's onResolved. We
+  // track whether the shopper has typed a city manually so a re-resolve
+  // (e.g. they fix a typo in the PIN) doesn't overwrite it.
+  const [cityManuallyEdited, setCityManuallyEdited] = useState(Boolean(initial?.city));
+
+  function applyPinResolution(r: { city: string; stateCode: string }) {
+    setForm((prev) => ({
+      ...prev,
+      city: cityManuallyEdited && prev.city.trim() ? prev.city : r.city,
+      state: r.stateCode,
+    }));
+  }
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -109,25 +116,26 @@ export function AddressForm({ initial, onSaved, onCancel }: Props) {
 
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">PIN code *</span>
-            <Input
-              required
-              inputMode="numeric"
-              maxLength={6}
-              pattern="[1-9][0-9]{5}"
+            <SmartPincodeInput
               value={form.pincode}
-              onChange={(e) => update('pincode', e.target.value.replace(/\D/g, ''))}
-              autoComplete="postal-code"
-              placeholder="6-digit PIN"
+              onChange={(v) => update('pincode', v)}
+              onResolved={applyPinResolution}
             />
-            <PincodeStatus state={pinLookupState} />
           </label>
 
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">City *</span>
-            <CitySelect
-              stateCode={form.state}
+            <SmartCityInput
               value={form.city}
-              onChange={(v) => update('city', v)}
+              stateCode={form.state}
+              onSelect={({ city, stateCode }) => {
+                setCityManuallyEdited(true);
+                setForm((prev) => ({
+                  ...prev,
+                  city,
+                  state: stateCode ?? prev.state,
+                }));
+              }}
             />
           </label>
 

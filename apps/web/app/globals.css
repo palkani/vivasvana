@@ -35,9 +35,37 @@
   * {
     @apply border-border;
   }
+  /* Defense-in-depth against horizontal scroll: any errant element that
+     overflows its parent gets clipped at the viewport instead of widening
+     the document. Individual scrollable regions still work (they set
+     overflow-x explicitly on themselves). */
+  html,
   body {
     @apply bg-background text-foreground antialiased;
+    overflow-x: hidden;
+  }
+  body {
     font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+  /* Long unbreakable strings (URLs, hashes, long product titles without
+     spaces) shouldn't blow out their container — wrap them. */
+  p, h1, h2, h3, h4, h5, h6, span, a {
+    overflow-wrap: anywhere;
+  }
+
+  /* Fraunces tuning: the SOFT axis (0-100, default 0) rounds the terminals.
+     A small bump warms the typeface for our wellness/Ayurveda brand voice
+     without losing the editorial serif gravitas. opsz auto-tracks
+     font-size in modern browsers, so we don't override that here. */
+  .font-serif {
+    font-feature-settings: 'kern', 'liga';
+    font-variation-settings: 'SOFT' 30;
+  }
+  /* Negative tracking on big headlines makes the curves breathe instead of
+     drifting apart at scale. */
+  h1.font-serif,
+  h2.font-serif {
+    letter-spacing: -0.018em;
   }
 }
 

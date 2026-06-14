@@ -1,6 +1,7 @@
 import type { PrismaClient, Prisma } from '@vivasvana/db';
 import { DiscountService } from './discount.service.js';
 import { OrderNumberService } from './order-number.service.js';
+import { OtpService } from './otp.service.js';
 
 export interface CreateOrderInput {
   userId?: string;
@@ -22,14 +23,20 @@ export interface CreateOrderInput {
   gstin?: string;
   companyName?: string;
   notes?: string;
+  /** 6-digit code emailed by /api/auth/order/request-otp. Required — guards
+   *  against API-driven fraud and confirms the shopper owns the email
+   *  the confirmation will go to. */
+  verificationCode?: string;
 }
 
 export class OrderService {
   private readonly discounts: DiscountService;
+  private readonly otp: OtpService;
   private readonly orderNumbers = new OrderNumberService();
 
   constructor(private readonly prisma: PrismaClient) {
     this.discounts = new DiscountService(prisma);
+    this.otp = new OtpService(prisma);
   }
 
   /**
@@ -43,6 +50,17 @@ export class OrderService {
    * will tighten the reservation window with TTL.
    */
   async createFromCart(input: CreateOrderInput) {
+    // OTP must be consumed BEFORE the transaction opens; OtpService writes
+    // its own row (`usedAt`) and we don't want a stock-race rollback to
+    // un-consume an OTP and let the shopper retry with the same code.
+    if (!input.verificationCode) throw new Error('VERIFICATION_REQUIRED');
+    const result = await this.otp.verify({
+      email: input.email,
+      code: input.verificationCode,
+      purpose: 'COD_VERIFY',
+    });
+    if (!result.ok) throw new Error(`OTP_${result.reason}`);
+
     return this.prisma.$transaction(async (tx) => {
       // 1. Load cart for this owner
       const cart = await tx.cart.findFirst({
@@ -169,18 +187,23 @@ export class OrderService {
         include: { items: true, shippingAddress: true },
       });
 
-      // 6. Provisionally decrement stock & log movement
+      // 6. Provisionally decrement stock & log movement.
+      // Use updateMany with a `stock >= qty` guard so the decrement is atomic
+      // at the SQL level. If two orders race for the last unit, one update()
+      // returns count=1, the other returns count=0 — and we throw. A plain
+      // update({decrement}) would silently let stock go negative.
       for (const it of items) {
-        if (it.variantId) {
-          await tx.productVariant.update({
-            where: { id: it.variantId },
-            data: { stock: { decrement: it.quantity } },
-          });
-        } else {
-          await tx.product.update({
-            where: { id: it.productId },
-            data: { stock: { decrement: it.quantity } },
-          });
+        const updateResult = it.variantId
+          ? await tx.productVariant.updateMany({
+              where: { id: it.variantId, stock: { gte: it.quantity } },
+              data: { stock: { decrement: it.quantity } },
+            })
+          : await tx.product.updateMany({
+              where: { id: it.productId, stock: { gte: it.quantity } },
+              data: { stock: { decrement: it.quantity } },
+            });
+        if (updateResult.count === 0) {
+          throw new Error(`INSUFFICIENT_STOCK:${it.productId}`);
         }
         await tx.stockMovement.create({
           data: {

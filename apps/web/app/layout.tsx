@@ -1,21 +1,35 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Playfair_Display } from 'next/font/google';
+import { Inter, Fraunces } from 'next/font/google';
 import './globals.css';
 import { Header } from '@/components/storefront/Header';
 import { Footer } from '@/components/storefront/Footer';
 import { TrustStrip } from '@/components/storefront/TrustStrip';
 import { cn } from '@/lib/utils';
 
+// Body: Inter — humanist sans, hyper-legible at body sizes, the proven
+// workhorse for ecommerce. Keep `cv11` (alternate single-storey g) off
+// because it can look "techy" against a warm food brand voice.
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-sans',
   display: 'swap',
 });
 
-const playfair = Playfair_Display({
+// Display: Fraunces — a variable serif with `opsz` (optical sizing) and
+// `SOFT` axes. At hero size it reads warm and editorial (think: Bon Appétit,
+// Outdoor Voices, premium DTC food). At product-title size the same family
+// stays elegant without screaming for attention.
+//
+// We omit a static weight array on purpose: declaring `weight: [...]` pulls
+// the static cuts and forbids variable axes, but we want the SOFT axis to
+// stay live so the CSS in globals.css can dial it per heading scale.
+const fraunces = Fraunces({
   subsets: ['latin'],
   variable: '--font-serif',
   display: 'swap',
+  // opsz auto-applies based on font-size; SOFT we tune via font-variation-
+  // settings in globals.css for per-element warmth control.
+  axes: ['SOFT'],
 });
 
 export const metadata: Metadata = {
@@ -41,7 +55,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cn(inter.variable, playfair.variable)}>
+    <html lang="en" className={cn(inter.variable, fraunces.variable)}>
       <body className="flex min-h-screen flex-col font-sans">
         <Header />
         <TrustStrip />

@@ -83,8 +83,11 @@ export function CartView({ initialCart }: Props) {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-      <div className="space-y-3">
+    // minmax(0, 1fr) — without the explicit `0` min, CSS grid uses `auto` and
+    // a long product title forces the left column wider than its share, which
+    // pushes the 360px sidebar past the viewport edge.
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="min-w-0 space-y-3">
         <p className="text-sm text-muted-foreground">
           {count} {pluralize(count, 'item')} in cart
         </p>
@@ -95,10 +98,12 @@ export function CartView({ initialCart }: Props) {
           const lineTotal = parseFloat(item.price) * item.quantity;
           return (
             <Card key={item.id}>
-              <CardContent className="flex items-center gap-4 p-4">
+              {/* Mobile: image + details stack as a row, controls + price wrap
+                  to a second row below. Desktop: everything on one line. */}
+              <CardContent className="flex flex-wrap items-center gap-3 p-3 sm:gap-4 sm:p-4">
                 <Link
                   href={`/products/${item.product.slug}`}
-                  className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md bg-muted"
+                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-muted sm:h-20 sm:w-20"
                 >
                   {image && (
                     <Image
@@ -110,62 +115,71 @@ export function CartView({ initialCart }: Props) {
                     />
                   )}
                 </Link>
-                <div className="min-w-0 flex-1">
+                {/* flex-1 + min-w-0 is the canonical way to make a flex child
+                    actually shrink and let `line-clamp` work. */}
+                <div className="min-w-0 flex-1 basis-[60%]">
                   <Link
                     href={`/products/${item.product.slug}`}
-                    className="block truncate font-medium hover:text-primary"
+                    className="block line-clamp-2 text-sm font-medium leading-snug hover:text-primary sm:text-base"
                   >
-                    {item.product.title}
+                    {item.product.title.split('|')[0]?.trim() ?? item.product.title}
                   </Link>
                   {item.variant && (
-                    <p className="text-xs text-muted-foreground">{item.variant.title}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{item.variant.title}</p>
                   )}
-                  <p className="mt-1 text-sm text-muted-foreground">{formatINR(item.price)} each</p>
+                  <p className="mt-1 text-xs text-muted-foreground sm:text-sm">
+                    {formatINR(item.price)} each
+                  </p>
                 </div>
-                <div className="flex items-center gap-1 rounded-md border">
+                {/* Qty + line total + remove — wraps under on narrow screens
+                    via flex-wrap on the parent. */}
+                <div className="ml-auto flex items-center gap-2 sm:gap-3">
+                  <div className="flex items-center gap-1 rounded-md border">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-none"
+                      onClick={() => updateItem(item.id, item.quantity - 1)}
+                      disabled={loading}
+                      aria-label="Decrease quantity"
+                    >
+                      −
+                    </Button>
+                    <span className="w-8 text-center text-sm tabular-nums" aria-live="polite">
+                      {item.quantity}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-none"
+                      onClick={() => updateItem(item.id, item.quantity + 1)}
+                      disabled={loading || item.quantity >= maxStock}
+                      aria-label="Increase quantity"
+                    >
+                      +
+                    </Button>
+                  </div>
+                  <div className="min-w-[64px] text-right text-sm font-medium tabular-nums sm:text-base">
+                    {formatINR(lineTotal)}
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-none"
-                    onClick={() => updateItem(item.id, item.quantity - 1)}
+                    className="h-8 w-8"
+                    onClick={() => removeItem(item.id)}
                     disabled={loading}
-                    aria-label="Decrease quantity"
+                    aria-label="Remove item"
                   >
-                    −
-                  </Button>
-                  <span className="w-8 text-center text-sm tabular-nums" aria-live="polite">
-                    {item.quantity}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 rounded-none"
-                    onClick={() => updateItem(item.id, item.quantity + 1)}
-                    disabled={loading || item.quantity >= maxStock}
-                    aria-label="Increase quantity"
-                  >
-                    +
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="w-20 text-right font-medium tabular-nums">
-                  {formatINR(lineTotal)}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removeItem(item.id)}
-                  disabled={loading}
-                  aria-label="Remove item"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </CardContent>
             </Card>
           );
         })}
       </div>
 
-      <Card className="sticky top-20 h-fit">
+      <Card className="h-fit min-w-0 lg:sticky lg:top-20">
         <CardHeader>
           <CardTitle className="text-lg">Order summary</CardTitle>
         </CardHeader>
