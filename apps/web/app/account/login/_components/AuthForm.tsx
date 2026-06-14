@@ -1,14 +1,13 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 import { api } from '@/lib/api';
 import type { Cart } from '@/lib/types';
-import { OAuthButtons } from './OAuthButtons';
 
 interface Props {
   redirectTo: string;
@@ -29,7 +28,6 @@ interface SignupVerifyResponse {
 
 export function AuthForm({ redirectTo }: Props) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>({ kind: 'signin' });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -38,22 +36,6 @@ export function AuthForm({ redirectTo }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-
-  // Surface OAuth failures funnelled back via /auth/callback. The
-  // callback route appends `?oauth_error=…` when the provider rejected
-  // the login or Supabase couldn't exchange the code. Read it once on
-  // mount and clear it from the URL so a refresh doesn't replay it.
-  useEffect(() => {
-    const oauthError = searchParams.get('oauth_error');
-    if (oauthError) {
-      setError(oauthError);
-      const params = new URLSearchParams(Array.from(searchParams.entries()));
-      params.delete('oauth_error');
-      router.replace(
-        params.toString() ? `?${params.toString()}` : window.location.pathname,
-      );
-    }
-  }, [searchParams, router]);
 
   async function mergeGuestCart(accessToken: string) {
     try {
@@ -238,15 +220,6 @@ export function AuthForm({ redirectTo }: Props) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <OAuthButtons
-          redirectTo={redirectTo}
-          onError={(msg) => setError(msg)}
-        />
-        <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="h-px flex-1 bg-border" aria-hidden />
-          <span className="uppercase tracking-wider">or with email</span>
-          <span className="h-px flex-1 bg-border" aria-hidden />
-        </div>
         <form
           onSubmit={step.kind === 'signin' ? handleSignin : handleRequestSignupOtp}
           className="space-y-3"
