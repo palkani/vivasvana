@@ -5,32 +5,23 @@
 # @vivasvana/* workspace packages. The API service is selected via
 # RAILWAY_SERVICE_ID in the deploy workflow.
 #
-# Nixpacks (Railway's default builder) auto-detects pnpm and Node from
-# package.json + .nvmrc; we override the build/start commands so the
-# Prisma client is generated and only the API package's build is run.
+# We use a Dockerfile rather than Nixpacks because Railway's nixpacks
+# builder doesn't reliably detect pnpm 9 in a monorepo with workspace:
+# protocol dependencies. The Dockerfile gives us deterministic builds
+# we can also run locally with `docker build -f apps/api/Dockerfile .`.
 
 [build]
-builder = "nixpacks"
-buildCommand = """\
-pnpm install --frozen-lockfile && \
-pnpm --filter @vivasvana/db generate && \
-pnpm turbo run build --filter=@vivasvana/api...\
-"""
+builder = "dockerfile"
+dockerfilePath = "apps/api/Dockerfile"
 
 [deploy]
-# start:prod skips the `--env-file=.env` flag the dev script uses;
-# Railway injects env vars into process.env directly so the file
-# wouldn't exist on disk and Node would crash on boot.
-startCommand = "pnpm --filter @vivasvana/api start:prod"
+# Health-check the API once Railway flips traffic. The Fastify /health
+# route returns 200 once Prisma has connected — exactly the readiness
+# signal we want before the new instance starts serving.
+healthcheckPath = "/health"
+healthcheckTimeout = 30
 
 # Restart if the process exits with a non-zero code, but cap retries so a
 # crash-loop doesn't burn CPU credits forever.
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5
-
-# Railway's load balancer probes this path before flipping traffic to a
-# new deployment. The Fastify /health route always returns 200 once the
-# Prisma client has connected — exactly what we want as a readiness
-# signal.
-healthcheckPath = "/health"
-healthcheckTimeout = 30
