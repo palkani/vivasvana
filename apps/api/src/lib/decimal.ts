@@ -16,6 +16,11 @@ export function serializeMoney<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj;
   if (Array.isArray(obj)) return obj.map(serializeMoney) as unknown as T;
   if (obj instanceof Prisma.Decimal) return (obj.toFixed(2) as unknown) as T;
+  // Date has no own-enumerable keys, so the previous `typeof === 'object'`
+  // branch turned every createdAt/updatedAt into `{}`. Frontend code that
+  // did `new Date(item.createdAt)` then got Invalid Date and silently
+  // failed (cart timestamps, order receipts, OTP expiry math).
+  if (obj instanceof Date) return (obj.toISOString() as unknown) as T;
   if (typeof obj === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj)) {

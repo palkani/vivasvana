@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { api } from '@/lib/api';
+import { useCartStore } from '@/lib/cart-store';
 
 interface Props {
   productId: string;
@@ -12,6 +12,11 @@ interface Props {
 
 export function AddToCartForm({ productId, maxQuantity }: Props) {
   const router = useRouter();
+  // Use the store's addItem (not raw api.post) so the header counter and
+  // any open cart drawer update from the same atomic write — otherwise
+  // the item lands server-side but the client snapshot stays stale until
+  // the next page load.
+  const addItem = useCartStore((s) => s.addItem);
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [adding, startAdding] = useTransition();
@@ -23,7 +28,7 @@ export function AddToCartForm({ productId, maxQuantity }: Props) {
     setError(null);
     startAdding(async () => {
       try {
-        await api.post('/api/cart/items', { productId, quantity });
+        await addItem(productId, quantity);
         router.refresh();
         then?.();
       } catch (e) {

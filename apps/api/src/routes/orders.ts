@@ -83,11 +83,13 @@ function ensureSessionCookie(req: import('fastify').FastifyRequest, reply: Fasti
   let sid = req.cookies[SESSION_COOKIE];
   if (!sid) {
     sid = randomUUID();
+    const prod = process.env.NODE_ENV === 'production';
     reply.setCookie(SESSION_COOKIE, sid, {
       path: '/',
       httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      // Cross-site cart cookie — see cart.ts for the full reasoning.
+      sameSite: prod ? 'none' : 'lax',
+      secure: prod,
       maxAge: 60 * 60 * 24 * 30,
     });
   }

@@ -36,12 +36,27 @@ function resolveOwner(
     reply.setCookie(SESSION_COOKIE, sid, {
       path: '/',
       httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      // Web is on vercel.app, API is on up.railway.app — different
+      // registrable domains, so the browser treats every cart fetch
+      // as cross-site. SameSite=Lax cookies aren't sent on cross-site
+      // fetch() calls, which made every add-to-cart create a fresh
+      // session and the cart appear permanently empty. SameSite=None
+      // sends the cookie, but it REQUIRES Secure — which is fine for
+      // QA + prod (both HTTPS). In local dev (same-origin localhost)
+      // we keep Lax + non-Secure so it works without HTTPS.
+      ...crossSiteCookieFlags(),
       maxAge: SESSION_MAX_AGE,
     });
   }
   return { sessionId: sid };
+}
+
+function crossSiteCookieFlags() {
+  const prod = process.env.NODE_ENV === 'production';
+  return {
+    sameSite: prod ? ('none' as const) : ('lax' as const),
+    secure: prod,
+  };
 }
 
 function mapServiceError(err: unknown, reply: import('fastify').FastifyReply) {
