@@ -4,17 +4,18 @@ import { ZodError } from 'zod';
 import { Prisma } from '@vivasvana/db';
 
 /**
- * When EXPOSE_ERROR_DETAILS=true (QA only — keep OFF in prod), 500 responses
- * include the underlying error name, code, and short message. Same data
- * that's already in Railway logs, just curl-able from outside so we can
- * diagnose without log access. Stack traces are NEVER included.
+ * Default ON — 500 responses include the underlying error name, code,
+ * and short message. Same data that's already in app.log.error, just
+ * curl-able from outside so we can diagnose without log access. Stack
+ * traces are NEVER included.
  *
- * In prod this stays off: leaking error names like "PrismaClientKnown..."
- * exposes ORM choice + sometimes table names, which is fine in QA but
- * unnecessary attack surface in prod.
+ * To suppress in production (so error-class names like
+ * "PrismaClientKnown..." don't leak ORM choice), set
+ * EXPOSE_ERROR_DETAILS=false on the prod env. Anywhere else, leave
+ * unset — diagnosability beats marginal info leakage in QA.
  */
 function detailsIfExposed(err: unknown) {
-  if (process.env.EXPOSE_ERROR_DETAILS !== 'true') return {};
+  if (process.env.EXPOSE_ERROR_DETAILS === 'false') return {};
   if (!(err instanceof Error)) return { detail: { type: typeof err } };
   const out: Record<string, unknown> = {
     detail: {

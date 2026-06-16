@@ -1,5 +1,28 @@
 import type { PrismaClient, Prisma } from '@vivasvana/db';
 
+/**
+ * Wrap a relation lookup so a transient DB error (pgbouncer race,
+ * replica lag, etc.) yields an empty list instead of taking the whole
+ * product page down. Logs to stderr with a tag so Railway log search
+ * still surfaces the underlying error.
+ */
+async function safeRelation<T>(
+  fn: () => Promise<T[]>,
+  name: string,
+  productId: string,
+): Promise<T[]> {
+  try {
+    return await fn();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[product.service] relation "${name}" failed for product ${productId} — degrading to []: ${msg}`,
+    );
+    return [];
+  }
+}
+
 export interface ListProductsArgs {
   page: number;
   pageSize: number;
@@ -67,6 +90,9 @@ export class ProductService {
   }
 
   async getBySlug(slug: string, includeUnpublished = false) {
+    // Core: product + the relations the page genuinely cannot render
+    // without (images, categories). If THIS query fails, the page must
+    // 500 — there's no graceful fallback.
     const product = await this.prisma.product.findFirst({
       where: {
         slug,
@@ -75,16 +101,39 @@ export class ProductService {
       },
       include: {
         images: { orderBy: { sortOrder: 'asc' } },
-        variants: { orderBy: { sortOrder: 'asc' } },
         categories: { include: { category: true } },
-        reviews: {
-          where: { status: 'APPROVED' },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        },
       },
     });
-    return product;
+    if (!product) return null;
+
+    // Optional relations: split into separate queries so a flaky one
+    // (e.g. pgbouncer prepared-statement race on a deeper include, or
+    // a future relation that hits a permissions issue) doesn't take
+    // the whole product page down. Each one degrades to an empty
+    // array with a warn-level log so we still see breakage in Railway
+    // without losing the page to users.
+    const variants = await safeRelation(
+      () =>
+        this.prisma.productVariant.findMany({
+          where: { productId: product.id },
+          orderBy: { sortOrder: 'asc' },
+        }),
+      'variants',
+      product.id,
+    );
+
+    const reviews = await safeRelation(
+      () =>
+        this.prisma.review.findMany({
+          where: { productId: product.id, status: 'APPROVED' },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        }),
+      'reviews',
+      product.id,
+    );
+
+    return { ...product, variants, reviews };
   }
 
   async create(input: Prisma.ProductCreateInput) {
