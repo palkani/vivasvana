@@ -30,6 +30,12 @@ const ADMIN_AUTH_DISABLED =
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  // Lightweight request log so Vercel's runtime stream shows what hit the
+  // edge. Useful when chasing why a specific route 500s — you can grep
+  // the Functions log by path.
+  // eslint-disable-next-line no-console
+  console.info('[vivasvana:mw]', request.method, request.nextUrl.pathname);
+
   // Fail-safe: if Supabase env vars haven't been wired (Vercel misconfig,
   // missing NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY), don't crash the entire
   // app with MIDDLEWARE_INVOCATION_FAILED. Skip auth gating instead so
@@ -39,7 +45,12 @@ export async function middleware(request: NextRequest) {
   if (!env.supabaseUrl || !env.supabaseAnonKey) {
     // eslint-disable-next-line no-console
     console.error(
-      '[middleware] NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY missing — skipping auth checks for this request',
+      '[vivasvana:mw] env vars missing — skipping auth checks',
+      {
+        path: request.nextUrl.pathname,
+        supabaseUrl: env.supabaseUrl ? 'set' : 'missing',
+        supabaseAnonKey: env.supabaseAnonKey ? 'set' : 'missing',
+      },
     );
     return response;
   }
