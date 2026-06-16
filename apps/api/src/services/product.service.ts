@@ -15,7 +15,6 @@ async function safeRelation<T>(
     return await fn();
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    // eslint-disable-next-line no-console
     console.warn(
       `[product.service] relation "${name}" failed for product ${productId} — degrading to []: ${msg}`,
     );
