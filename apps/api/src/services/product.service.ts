@@ -89,50 +89,61 @@ export class ProductService {
   }
 
   async getBySlug(slug: string, includeUnpublished = false) {
-    // Core: product + the relations the page genuinely cannot render
-    // without (images, categories). If THIS query fails, the page must
-    // 500 — there's no graceful fallback.
-    const product = await this.prisma.product.findFirst({
-      where: {
-        slug,
-        deletedAt: null,
-        ...(includeUnpublished ? {} : { status: 'PUBLISHED' }),
-      },
-      include: {
-        images: { orderBy: { sortOrder: 'asc' } },
-        categories: { include: { category: true } },
-      },
+    // Wrap the whole detail load in $transaction so pgbouncer keeps
+    // every query on the same physical connection for its duration.
+    // Without this, an `include` that generates N sub-queries can have
+    // each one routed to a different pooled connection, and Prisma's
+    // prepared statements race — Postgres errors with
+    //   "bind message supplies 4 parameters, but prepared statement
+    //    s8 requires 2"
+    // ...because `s8` was prepared on a connection that this bind never
+    // reaches. The list endpoint accidentally avoided this because it
+    // already uses $transaction([count, findMany]).
+    //
+    // Properly, the operator should also add `?pgbouncer=true&connection_limit=1`
+    // to DATABASE_URL to disable Prisma prepared statements at the pool
+    // layer — defense in depth. This change holds even if they don't.
+    return this.prisma.$transaction(async (tx) => {
+      const product = await tx.product.findFirst({
+        where: {
+          slug,
+          deletedAt: null,
+          ...(includeUnpublished ? {} : { status: 'PUBLISHED' }),
+        },
+        include: {
+          images: { orderBy: { sortOrder: 'asc' } },
+          categories: { include: { category: true } },
+        },
+      });
+      if (!product) return null;
+
+      // Variants + reviews remain split (one query each, not nested
+      // includes) so a transient failure can degrade gracefully via
+      // safeRelation — but they now run inside the same transaction,
+      // so pgbouncer keeps them on the same connection.
+      const variants = await safeRelation(
+        () =>
+          tx.productVariant.findMany({
+            where: { productId: product.id },
+            orderBy: { sortOrder: 'asc' },
+          }),
+        'variants',
+        product.id,
+      );
+
+      const reviews = await safeRelation(
+        () =>
+          tx.review.findMany({
+            where: { productId: product.id, status: 'APPROVED' },
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+          }),
+        'reviews',
+        product.id,
+      );
+
+      return { ...product, variants, reviews };
     });
-    if (!product) return null;
-
-    // Optional relations: split into separate queries so a flaky one
-    // (e.g. pgbouncer prepared-statement race on a deeper include, or
-    // a future relation that hits a permissions issue) doesn't take
-    // the whole product page down. Each one degrades to an empty
-    // array with a warn-level log so we still see breakage in Railway
-    // without losing the page to users.
-    const variants = await safeRelation(
-      () =>
-        this.prisma.productVariant.findMany({
-          where: { productId: product.id },
-          orderBy: { sortOrder: 'asc' },
-        }),
-      'variants',
-      product.id,
-    );
-
-    const reviews = await safeRelation(
-      () =>
-        this.prisma.review.findMany({
-          where: { productId: product.id, status: 'APPROVED' },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        }),
-      'reviews',
-      product.id,
-    );
-
-    return { ...product, variants, reviews };
   }
 
   async create(input: Prisma.ProductCreateInput) {
