@@ -25,7 +25,17 @@ interface RequestOptions extends RequestInit {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const url = path.startsWith('http') ? path : `${env.apiUrl}${path}`;
+  // Browser: use a RELATIVE URL so the request goes to our own origin
+  // (vivasvana.vercel.app/api/...) and gets transparently proxied to
+  // Railway by the next.config rewrite. This makes cart cookies
+  // first-party — without it they get dropped as third-party.
+  //
+  // Server (RSC, server actions): need an absolute URL because there's
+  // no "origin" to be relative to. Use the configured Railway URL —
+  // server-side fetches aren't subject to browser cookie policy.
+  const isServer = typeof window === 'undefined';
+  const base = isServer ? env.apiUrl : '';
+  const url = path.startsWith('http') ? path : `${base}${path}`;
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
   if (options.body && !headers.has('Content-Type')) {
