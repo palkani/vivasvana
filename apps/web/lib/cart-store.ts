@@ -86,19 +86,32 @@ export const useCartStore = create<CartState>()(
       },
     }),
     {
-      name: 'vv_cart_snapshot',
+      // Bumped key — users who carry stale snapshots from before the
+      // proxy + Date-serialization fixes had `cart.items` populated with
+      // shapes (timestamps as `{}`, third-party-blocked sessions) that
+      // could throw on hydration. New key = fresh state; the old key's
+      // data is left in localStorage but never read.
+      name: 'vv_cart_snapshot_v2',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ cart: state.cart }),
     },
   ),
 );
 
+// Helpers — defensive against malformed snapshots (corrupted persist,
+// API change, etc.). Header renders these on every paint; one bad
+// snapshot taking the whole storefront down is not worth a tighter
+// type contract.
 export function cartItemCount(cart: Cart | null): number {
-  if (!cart) return 0;
-  return cart.items.reduce((sum, item) => sum + item.quantity, 0);
+  if (!cart || !Array.isArray(cart.items)) return 0;
+  return cart.items.reduce((sum, item) => sum + (Number(item?.quantity) || 0), 0);
 }
 
 export function cartSubtotal(cart: Cart | null): number {
-  if (!cart) return 0;
-  return cart.items.reduce((sum, item) => sum + parseFloat(item.price) * item.quantity, 0);
+  if (!cart || !Array.isArray(cart.items)) return 0;
+  return cart.items.reduce((sum, item) => {
+    const price = parseFloat(item?.price ?? '0');
+    const qty = Number(item?.quantity) || 0;
+    return sum + (Number.isFinite(price) ? price * qty : 0);
+  }, 0);
 }
