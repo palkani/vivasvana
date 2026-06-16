@@ -30,6 +30,20 @@ const ADMIN_AUTH_DISABLED =
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  // Fail-safe: if Supabase env vars haven't been wired (Vercel misconfig,
+  // missing NEXT_PUBLIC_SUPABASE_URL/_ANON_KEY), don't crash the entire
+  // app with MIDDLEWARE_INVOCATION_FAILED. Skip auth gating instead so
+  // public pages still load and the operator can hit /api/_env-check to
+  // diagnose. Routes that genuinely need a session will redirect via
+  // their layout-level checks anyway.
+  if (!env.supabaseUrl || !env.supabaseAnonKey) {
+    // eslint-disable-next-line no-console
+    console.error(
+      '[middleware] NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY missing — skipping auth checks for this request',
+    );
+    return response;
+  }
+
   const supabase = createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
     cookies: {
       getAll: () => request.cookies.getAll(),
@@ -75,5 +89,12 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.png$|.*\\.svg$).*)'],
+  // Exclude /api/_env-check from the middleware matcher so the diagnostic
+  // endpoint is reachable even when middleware itself can't run (missing
+  // env vars, edge-runtime crash, etc.). Routes under /api/* generally
+  // don't need session refresh anyway — auth happens via the Bearer token
+  // pattern, not Supabase cookies.
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|api/_env-check|.*\\.png$|.*\\.svg$).*)',
+  ],
 };
