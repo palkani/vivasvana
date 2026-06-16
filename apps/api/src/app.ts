@@ -60,8 +60,33 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
 
   // Core hardening
   await app.register(helmet, { contentSecurityPolicy: false });
+  // Origins: comma-separated list, each entry is either:
+  //   - a literal origin    e.g.  https://vivasvana.vercel.app
+  //   - a wildcard pattern  e.g.  https://*.vercel.app  or  https://vivasvana-*-vivasvana-s-projects.vercel.app
+  // Vercel mints a fresh per-deployment hostname (xxxxx.vercel.app) on
+  // every push — a literal allowlist can't keep up, so we support `*`
+  // segments by compiling them into RegExp. `*` matches one or more
+  // non-`/` chars, which is tight enough that an open `https://*` still
+  // wouldn't accidentally allow malicious origins on unrelated TLDs.
+  const corsOrigins = env.API_CORS_ORIGINS.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      if (!entry.includes('*')) return entry;
+      const regexBody = entry
+        .split('*')
+        .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+        .join('[^/]+');
+      return new RegExp(`^${regexBody}$`);
+    });
+  app.log.info(
+    {
+      origins: corsOrigins.map((o) => (o instanceof RegExp ? `regex:${o.source}` : o)),
+    },
+    'cors allowlist resolved',
+  );
   await app.register(cors, {
-    origin: env.API_CORS_ORIGINS.split(',').map((s) => s.trim()),
+    origin: corsOrigins,
     credentials: true,
   });
   await app.register(cookie);
