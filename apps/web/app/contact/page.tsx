@@ -11,14 +11,20 @@ export const metadata: Metadata = {
 
 export default async function ContactPage() {
   // Pull the signed-in user's email so the form can pre-fill + lock it.
-  // No auth requirement — guests can submit too.
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const initialEmail = user?.email ?? '';
-  const emailLocked = Boolean(user?.email);
+  // No auth requirement — guests can submit too. Guard the Supabase call
+  // so a missing env at build time doesn't fail prerender; the form still
+  // works without a pre-filled email.
+  let initialEmail = '';
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    initialEmail = user?.email ?? '';
+  } catch {
+    // Env not wired at build time — render the page anyway.
+  }
+  const emailLocked = Boolean(initialEmail);
 
   return (
     <div className="container py-12 md:py-16">

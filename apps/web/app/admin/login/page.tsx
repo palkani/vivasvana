@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// Reads searchParams and calls Supabase server client — both incompatible
+// with build-time prerender on Vercel where env vars aren't injected yet.
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
   searchParams: Promise<{ redirectTo?: string }>;
 }

@@ -4,6 +4,11 @@ import { AdminSidebar } from './_components/AdminSidebar';
 import { DevAuthBanner } from './_components/DevAuthBanner';
 import { AdminMeProvider } from './_components/AdminMeProvider';
 
+// Admin pages need a live Supabase session check — prerendering them at
+// build time would call createSupabaseServerClient() before env vars are
+// available, killing the build. Render at request time instead.
+export const dynamic = 'force-dynamic';
+
 const ADMIN_AUTH_DISABLED =
   process.env.NODE_ENV !== 'production' &&
   process.env.NEXT_PUBLIC_ADMIN_AUTH_DISABLED === 'true';

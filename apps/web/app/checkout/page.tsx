@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// Reads cart cookies + Supabase session — always per-request.
+export const dynamic = 'force-dynamic';
+
 async function fetchCart(): Promise<Cart | null> {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore

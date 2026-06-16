@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// Calls Supabase server client to check existing session — never prerender.
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
   searchParams: Promise<{ redirectTo?: string }>;
 }

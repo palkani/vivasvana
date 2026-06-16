@@ -2,6 +2,11 @@ import Link from 'next/link';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { AccountSidebar } from './_components/AccountSidebar';
 
+// Account pages are user-specific and need a live session — never
+// prerender them. Without this, build-time Supabase client creation
+// throws because env vars aren't available to the build worker.
+export const dynamic = 'force-dynamic';
+
 /**
  * Auth gate lives in middleware.ts — unauthenticated visitors to /account/*
  * (except /account/login) are redirected at the edge. By the time this
