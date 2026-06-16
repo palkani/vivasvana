@@ -3,6 +3,31 @@ import type { FastifyError } from 'fastify';
 import { ZodError } from 'zod';
 import { Prisma } from '@vivasvana/db';
 
+/**
+ * When EXPOSE_ERROR_DETAILS=true (QA only — keep OFF in prod), 500 responses
+ * include the underlying error name, code, and short message. Same data
+ * that's already in Railway logs, just curl-able from outside so we can
+ * diagnose without log access. Stack traces are NEVER included.
+ *
+ * In prod this stays off: leaking error names like "PrismaClientKnown..."
+ * exposes ORM choice + sometimes table names, which is fine in QA but
+ * unnecessary attack surface in prod.
+ */
+function detailsIfExposed(err: unknown) {
+  if (process.env.EXPOSE_ERROR_DETAILS !== 'true') return {};
+  if (!(err instanceof Error)) return { detail: { type: typeof err } };
+  const out: Record<string, unknown> = {
+    detail: {
+      name: err.name,
+      message: err.message,
+    },
+  };
+  if ('code' in err && typeof err.code === 'string') {
+    (out.detail as Record<string, unknown>).code = err.code;
+  }
+  return out;
+}
+
 export default fp(
   async (app) => {
     app.setErrorHandler((err: FastifyError, req, reply) => {
@@ -23,8 +48,12 @@ export default fp(
         if (err.code === 'P2025') {
           return reply.status(404).send({ error: 'NotFound', message: 'Resource not found' });
         }
-        app.log.error({ err }, 'prisma known request error');
-        return reply.status(500).send({ error: 'DatabaseError', message: 'Database error' });
+        app.log.error({ err, url: req.url }, 'prisma known request error');
+        return reply.status(500).send({
+          error: 'DatabaseError',
+          message: 'Database error',
+          ...detailsIfExposed(err),
+        });
       }
 
       // Fastify HTTP errors (from @fastify/sensible) carry statusCode
@@ -35,8 +64,22 @@ export default fp(
         });
       }
 
-      app.log.error({ err, url: req.url }, 'unhandled error');
-      return reply.status(500).send({ error: 'InternalServerError', message: 'Something went wrong' });
+      // Catch-all for unknown errors. Log with a stable fingerprint so we can
+      // grep Railway for it and surface as much as the operator allows via
+      // EXPOSE_ERROR_DETAILS.
+      const errType =
+        err instanceof Error
+          ? `${err.constructor.name}${'code' in err && err.code ? `:${err.code}` : ''}`
+          : typeof err;
+      app.log.error(
+        { err, url: req.url, errType, method: req.method },
+        'unhandled error',
+      );
+      return reply.status(500).send({
+        error: 'InternalServerError',
+        message: 'Something went wrong',
+        ...detailsIfExposed(err),
+      });
     });
 
     app.setNotFoundHandler((req, reply) => {
