@@ -12,11 +12,25 @@ import { ProductCard } from '@/components/storefront/ProductCard';
 import { TestimonialsRow, type Testimonial } from '@/components/storefront/TestimonialsRow';
 import { NewsletterBand } from '@/components/storefront/NewsletterBand';
 import { api } from '@/lib/api';
+import { env } from '@/lib/env';
 import type { ProductListResponse } from '@/lib/types';
 
+// Render at request time, not at build. Prerendering at build needed the
+// API to be reachable from the Vercel build runner — when it wasn't
+// (env misconfig or Railway unreachable from CI's network), every page
+// build worker hung on the fetch and Next.js killed the build at its
+// 60s deadline. Request-time rendering moves that to a runtime cache
+// miss, where the env IS configured and the API IS reachable.
+export const dynamic = 'force-dynamic';
 export const revalidate = 60;
 
 async function getFeaturedProducts() {
+  // Belt-and-braces: never try to fetch in a build that has the localhost
+  // fallback baked in. Returns an empty list so the rest of the page can
+  // still render statically.
+  if (env.apiUrl.startsWith('http://localhost')) {
+    return [];
+  }
   try {
     const res = await api.get<ProductListResponse>('/api/products?pageSize=3', {
       next: { revalidate: 60 },
@@ -29,6 +43,7 @@ async function getFeaturedProducts() {
 }
 
 async function getTestimonials(): Promise<Testimonial[]> {
+  if (env.apiUrl.startsWith('http://localhost')) return [];
   try {
     const res = await api.get<{ items: Testimonial[] }>('/api/testimonials?limit=3', {
       next: { revalidate: 300 },

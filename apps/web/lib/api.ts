@@ -34,7 +34,21 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   if (options.forwardCookies) headers.set('Cookie', options.forwardCookies);
   if (options.accessToken) headers.set('Authorization', `Bearer ${options.accessToken}`);
 
-  const res = await fetch(url, { ...options, headers, credentials: 'include' });
+  // Hard timeout so a dead API doesn't hang Next.js's static-page worker
+  // (which has its own 60s outer deadline). 8 s is comfortably more than
+  // any real request should ever take but small enough to fail-fast on
+  // localhost-misconfig during builds.
+  const timeoutSignal = AbortSignal.timeout(8000);
+  const combinedSignal = options.signal
+    ? AbortSignal.any([options.signal, timeoutSignal])
+    : timeoutSignal;
+
+  const res = await fetch(url, {
+    ...options,
+    headers,
+    credentials: 'include',
+    signal: combinedSignal,
+  });
   const text = await res.text();
   const payload = text ? safeJson(text) : null;
 
