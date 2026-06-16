@@ -60,18 +60,30 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
 
   // Core hardening
   await app.register(helmet, { contentSecurityPolicy: false });
+
   // Origins: comma-separated list, each entry is either:
   //   - a literal origin    e.g.  https://vivasvana.vercel.app
-  //   - a wildcard pattern  e.g.  https://*.vercel.app  or  https://vivasvana-*-vivasvana-s-projects.vercel.app
-  // Vercel mints a fresh per-deployment hostname (xxxxx.vercel.app) on
-  // every push — a literal allowlist can't keep up, so we support `*`
-  // segments by compiling them into RegExp. `*` matches one or more
-  // non-`/` chars, which is tight enough that an open `https://*` still
-  // wouldn't accidentally allow malicious origins on unrelated TLDs.
-  const corsOrigins = env.API_CORS_ORIGINS.split(',')
+  //   - a wildcard pattern  e.g.  https://*.vercel.app
+  // Vercel mints a fresh per-deployment hostname on every push, so a
+  // literal allowlist can't keep up. `*` compiles to `[^/]+` — one or
+  // more non-`/` chars — tight enough that `https://*.vercel.app`
+  // won't accidentally allow `https://attacker.com/.vercel.app`.
+  //
+  // ALWAYS reflexively allow `*.vercel.app` and `*.up.railway.app`
+  // regardless of env, so the cart still works from any preview deploy
+  // even if an operator forgot to wire the env var on Railway. Locking
+  // those down further is a prod-only concern (where you'd set
+  // API_CORS_ORIGINS to the bare canonical domain only).
+  const HARD_DEFAULTS: (string | RegExp)[] = [
+    /^https:\/\/[^/]+\.vercel\.app$/,
+    /^https:\/\/[^/]+\.up\.railway\.app$/,
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+  ];
+  const envEntries = env.API_CORS_ORIGINS.split(',')
     .map((s) => s.trim())
     .filter(Boolean)
-    .map((entry) => {
+    .map((entry): string | RegExp => {
       if (!entry.includes('*')) return entry;
       const regexBody = entry
         .split('*')
@@ -79,16 +91,48 @@ export async function buildApp(opts: FastifyServerOptions = {}) {
         .join('[^/]+');
       return new RegExp(`^${regexBody}$`);
     });
+  const corsAllowlist: (string | RegExp)[] = [...envEntries, ...HARD_DEFAULTS];
+
   app.log.info(
     {
-      origins: corsOrigins.map((o) => (o instanceof RegExp ? `regex:${o.source}` : o)),
+      env: env.API_CORS_ORIGINS,
+      allowlist: corsAllowlist.map((o) =>
+        o instanceof RegExp ? `regex:${o.source}` : `literal:${o}`,
+      ),
     },
     'cors allowlist resolved',
   );
+
+  // Function-form origin check so every reject is LOGGED with the
+  // attempted origin — turns "why is CORS failing" into a one-line
+  // Railway log lookup instead of a guessing game.
   await app.register(cors, {
-    origin: corsOrigins,
     credentials: true,
+    origin: (incomingOrigin, cb) => {
+      // No Origin header → same-origin or curl/server-to-server. Allow.
+      if (!incomingOrigin) return cb(null, true);
+      const matched = corsAllowlist.some((entry) =>
+        entry instanceof RegExp ? entry.test(incomingOrigin) : entry === incomingOrigin,
+      );
+      if (matched) return cb(null, true);
+      app.log.warn(
+        { origin: incomingOrigin, allowlist: corsAllowlist.length },
+        'cors origin rejected',
+      );
+      return cb(null, false);
+    },
   });
+
+  // Tiny diagnostic so we can curl the API and confirm what allowlist
+  // is actually loaded — invaluable for "is the env var taking effect"
+  // questions without needing Railway log access. Returns regex source,
+  // not values, so it leaks nothing sensitive.
+  app.get('/api/_diag/cors', async () => ({
+    env: env.API_CORS_ORIGINS,
+    allowlist: corsAllowlist.map((o) =>
+      o instanceof RegExp ? `regex:${o.source}` : `literal:${o}`,
+    ),
+  }));
   await app.register(cookie);
   await app.register(sensible);
   await app.register(rateLimit, {
