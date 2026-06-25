@@ -2,7 +2,14 @@ import type { PrismaClient, Order, OrderItem, OrderShipping } from '@vivasvana/d
 import { sendEmail } from '../integrations/email.js';
 import { sendSms } from '../integrations/sms.js';
 import { renderOrderConfirmation, renderWelcome } from '../emails/templates.js';
-import { renderOrderConfirmationSms } from '../sms/templates.js';
+import {
+  renderOrderConfirmationSms,
+  renderOrderShippedSms,
+  renderOrderDeliveredSms,
+  renderOrderCancelledSms,
+} from '../sms/templates.js';
+
+export type OrderStatusUpdate = 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
 /**
  * Fire-and-forget notification dispatcher. Failures should never block the
@@ -79,6 +86,52 @@ export class NotificationService {
       console.error('order confirmation sms failed', {
         orderId: order.id,
         orderNumber: order.orderNumber,
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  /**
+   * Status-change SMS for SHIPPED / DELIVERED / CANCELLED. Single entry
+   * point so callers in admin routes don't have to know the template
+   * names; the switch lives here. Email is intentionally NOT sent today
+   * — these transitions are operationally noisy and shoppers find the
+   * SMS sufficient. A Phase 4 outbox can fan to email if support asks.
+   */
+  async sendOrderStatusUpdate(orderId: string, kind: OrderStatusUpdate) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true, shippingAddress: true },
+    });
+    if (!order) return;
+    try {
+      const phone = order.shippingAddress?.phone || order.phone;
+      if (!phone) return;
+
+      let body: string;
+      switch (kind) {
+        case 'SHIPPED':
+          body = renderOrderShippedSms({
+            orderNumber: order.orderNumber,
+            // carrier + tracking live on OrderShipping (set by adminShip),
+            // not on Order itself.
+            carrier: order.shippingAddress?.carrier,
+            trackingNumber: order.shippingAddress?.trackingNumber,
+          });
+          break;
+        case 'DELIVERED':
+          body = renderOrderDeliveredSms({ orderNumber: order.orderNumber });
+          break;
+        case 'CANCELLED':
+          body = renderOrderCancelledSms({ orderNumber: order.orderNumber });
+          break;
+      }
+      await sendSms({ to: phone, body });
+    } catch (err) {
+      console.error('order status sms failed', {
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        kind,
         error: (err as Error).message,
       });
     }

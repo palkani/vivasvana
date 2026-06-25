@@ -152,7 +152,7 @@ const adminOrderRoutes: FastifyPluginAsyncZod = async (app) => {
       async (req, reply) => {
         try {
           const order = await orders.adminShip(req.params.id, req.body);
-          // TODO Phase 4: send shipping notification email with tracking link
+          void notifications.sendOrderStatusUpdate(order.id, 'SHIPPED');
           return serializeMoney(order);
         } catch (err) {
           return mapError(err, reply);
@@ -192,7 +192,9 @@ const adminOrderRoutes: FastifyPluginAsyncZod = async (app) => {
       },
       async (req, reply) => {
         try {
-          return serializeMoney(await orders.adminMarkDelivered(req.params.id));
+          const order = await orders.adminMarkDelivered(req.params.id);
+          void notifications.sendOrderStatusUpdate(order.id, 'DELIVERED');
+          return serializeMoney(order);
         } catch (err) {
           return mapError(err, reply);
         }
@@ -212,7 +214,9 @@ const adminOrderRoutes: FastifyPluginAsyncZod = async (app) => {
       },
       async (req, reply) => {
         try {
-          return serializeMoney(await orders.adminCancel(req.params.id, req.body.reason));
+          const order = await orders.adminCancel(req.params.id, req.body.reason);
+          void notifications.sendOrderStatusUpdate(order.id, 'CANCELLED');
+          return serializeMoney(order);
         } catch (err) {
           return mapError(err, reply);
         }

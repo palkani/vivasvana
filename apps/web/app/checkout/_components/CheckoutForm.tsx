@@ -146,13 +146,21 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
         const supabase = createSupabaseBrowserClient();
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData.session?.access_token;
+        // Send the shipping phone too — the API uses it (when present) to
+        // dispatch the OTP via SMS in addition to email. Falls back to the
+        // contact phone if the shipping form hasn't been filled yet.
+        const otpPhone = contactPhone || shipping.phone || undefined;
         const res = await api.post<{ email: string; expiresAt: string }>(
           '/api/auth/order/request-otp',
-          { email: contactEmail },
+          { email: contactEmail, phone: otpPhone },
           { accessToken },
         );
         setOtpStage({ kind: 'awaiting', emailSent: res.email });
-        setOtpInfo(`We sent a 6-digit code to ${res.email}. Enter it below to place the order.`);
+        setOtpInfo(
+          otpPhone
+            ? `We sent a 6-digit code to ${res.email} and your phone. Enter it below to place the order.`
+            : `We sent a 6-digit code to ${res.email}. Enter it below to place the order.`,
+        );
       } catch (e) {
         const err = e as { payload?: { message?: string }; message?: string };
         setError(err.payload?.message ?? err.message ?? 'Could not send verification code');

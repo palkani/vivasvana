@@ -23,3 +23,50 @@ export function renderOrderConfirmationSms(order: {
     `Track: ${SITE}/orders. Thanks!`
   );
 }
+
+/**
+ * One template for both signup and order-time OTPs. Wording stays uniform
+ * on purpose — shoppers who see "verification code" twice in a session
+ * (account + checkout) shouldn't be confused by differently-worded SMS.
+ * The "account" vs "order" tag gives just enough context to disambiguate.
+ */
+export function renderOtpSms(args: {
+  code: string;
+  kind: 'signup' | 'order';
+  expiresInMinutes: number;
+}): string {
+  const tag = args.kind === 'signup' ? 'account' : 'order';
+  // Example: "Vivasvana: 123456 is your account verification code.
+  //  Valid 10 min. Do not share." (~85 chars)
+  return (
+    `Vivasvana: ${args.code} is your ${tag} verification code. ` +
+    `Valid ${args.expiresInMinutes} min. Do not share.`
+  );
+}
+
+export function renderOrderShippedSms(args: {
+  orderNumber: string;
+  carrier?: string | null;
+  trackingNumber?: string | null;
+}): string {
+  const via = args.carrier ? ` via ${args.carrier}` : '';
+  const tn = args.trackingNumber ? ` (AWB ${args.trackingNumber})` : '';
+  return (
+    `Vivasvana: Order ${args.orderNumber} shipped${via}${tn}. ` +
+    `Track: ${SITE}/orders`
+  );
+}
+
+export function renderOrderDeliveredSms(args: { orderNumber: string }): string {
+  return (
+    `Vivasvana: Order ${args.orderNumber} delivered. ` +
+    `Loved it? Reorder at ${SITE}. Thanks!`
+  );
+}
+
+export function renderOrderCancelledSms(args: { orderNumber: string }): string {
+  return (
+    `Vivasvana: Order ${args.orderNumber} cancelled. ` +
+    `Refund processed if paid. Help: hello@vivasvana.com`
+  );
+}

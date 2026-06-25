@@ -2,7 +2,9 @@ import type { PrismaClient } from '@vivasvana/db';
 import { OtpService } from './otp.service.js';
 import { supabaseAdmin } from '../integrations/supabase-admin.js';
 import { sendEmail } from '../integrations/email.js';
+import { sendSms } from '../integrations/sms.js';
 import { renderOtp } from '../emails/templates.js';
+import { renderOtpSms } from '../sms/templates.js';
 
 /**
  * Customer authentication orchestrator.
@@ -40,7 +42,12 @@ export class AuthService {
    * and re-sends them in stage 2. This keeps an abandoned signup from
    * leaving an unconfirmed account in our DB.
    */
-  async requestSignupOtp(args: { email: string; password: string; name?: string }) {
+  async requestSignupOtp(args: {
+    email: string;
+    password: string;
+    name?: string;
+    phone?: string;
+  }) {
     const email = args.email.trim().toLowerCase();
     if (!email || !args.password || args.password.length < 8) {
       throw new Error('INVALID_CREDENTIALS');
@@ -57,6 +64,25 @@ export class AuthService {
       expiresInMinutes: OTP_TTL_MIN,
     });
     await sendEmail({ to: email, ...mail });
+
+    // SMS in addition to email when phone is provided. Fire-and-forget —
+    // a Twilio outage (or missing creds in dev) must NOT block signup.
+    // sendSms already handles invalid numbers + missing creds gracefully.
+    if (args.phone) {
+      void sendSms({
+        to: args.phone,
+        body: renderOtpSms({
+          code: issued.code,
+          kind: 'signup',
+          expiresInMinutes: OTP_TTL_MIN,
+        }),
+      }).catch((err) =>
+        console.warn('signup otp sms failed (non-blocking)', {
+          email,
+          error: (err as Error).message,
+        }),
+      );
+    }
     return { email, expiresAt: issued.expiresAt };
   }
 
@@ -153,7 +179,11 @@ export class AuthService {
    * logged-in users we ignore the form email and use the verified
    * account email (form value is treated as a hint only).
    */
-  async requestOrderOtp(args: { email: string; loggedInEmail?: string }) {
+  async requestOrderOtp(args: {
+    email: string;
+    loggedInEmail?: string;
+    phone?: string;
+  }) {
     const email = (args.loggedInEmail ?? args.email).trim().toLowerCase();
     if (!email) throw new Error('EMAIL_REQUIRED');
 
@@ -164,6 +194,25 @@ export class AuthService {
       expiresInMinutes: OTP_TTL_MIN,
     });
     await sendEmail({ to: email, ...mail });
+
+    // SMS in addition to email when phone is provided. Same fire-and-
+    // forget pattern as signup — a checkout in flight is the worst
+    // possible time to fail-hard on a Twilio hiccup.
+    if (args.phone) {
+      void sendSms({
+        to: args.phone,
+        body: renderOtpSms({
+          code: issued.code,
+          kind: 'order',
+          expiresInMinutes: OTP_TTL_MIN,
+        }),
+      }).catch((err) =>
+        console.warn('order otp sms failed (non-blocking)', {
+          email,
+          error: (err as Error).message,
+        }),
+      );
+    }
     return { email, expiresAt: issued.expiresAt };
   }
 }

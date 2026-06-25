@@ -32,6 +32,7 @@ export function AuthForm({ redirectTo }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -81,7 +82,12 @@ export function AuthForm({ redirectTo }: Props) {
       try {
         const res = await api.post<{ email: string; expiresAt: string }>(
           '/api/auth/signup/request-otp',
-          { email, password, name: name.trim() || undefined },
+          {
+            email,
+            password,
+            name: name.trim() || undefined,
+            phone: phone.trim() || undefined,
+          },
         );
         setStep({ kind: 'signup-otp', email: res.email, expiresAt: res.expiresAt });
         setInfo(`We sent a 6-digit code to ${res.email}. It expires in 10 minutes.`);
@@ -132,7 +138,12 @@ export function AuthForm({ redirectTo }: Props) {
       try {
         const res = await api.post<{ email: string; expiresAt: string }>(
           '/api/auth/signup/request-otp',
-          { email, password, name: name.trim() || undefined },
+          {
+            email,
+            password,
+            name: name.trim() || undefined,
+            phone: phone.trim() || undefined,
+          },
         );
         setStep({ kind: 'signup-otp', email: res.email, expiresAt: res.expiresAt });
         setInfo(`A fresh code is on its way to ${res.email}.`);
@@ -233,6 +244,24 @@ export function AuthForm({ redirectTo }: Props) {
                 autoComplete="name"
                 required
               />
+            </label>
+          )}
+          {step.kind === 'signup' && (
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">
+                Phone <span className="text-muted-foreground">(optional)</span>
+              </span>
+              <Input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                autoComplete="tel"
+                placeholder="10-digit mobile number"
+                inputMode="tel"
+              />
+              <span className="text-xs text-muted-foreground">
+                We&rsquo;ll send order updates by SMS if you add a number.
+              </span>
             </label>
           )}
           <label className="block space-y-1">

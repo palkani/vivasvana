@@ -4,10 +4,16 @@ import { z } from 'zod';
 import { AuthService } from '../services/auth.service.js';
 import { OtpService } from '../services/otp.service.js';
 
+// Phone is optional on both OTP requests. When present we also dispatch
+// the code via SMS (Twilio). Loose validation here — sms/integrations
+// normalizes to E.164 and refuses unparseable numbers there.
+const PhoneField = z.string().trim().min(7).max(20).optional();
+
 const SignupBody = z.object({
   email: z.string().trim().email(),
   password: z.string().min(8).max(72),
   name: z.string().trim().min(1).max(80).optional(),
+  phone: PhoneField,
 });
 
 const VerifyBody = z.object({
@@ -19,6 +25,7 @@ const VerifyBody = z.object({
 
 const OrderOtpBody = z.object({
   email: z.string().trim().email(),
+  phone: PhoneField,
 });
 
 function mapError(err: unknown, reply: FastifyReply) {
@@ -129,6 +136,7 @@ const authRoutes: FastifyPluginAsyncZod = async (app) => {
       try {
         const result = await service.requestOrderOtp({
           email: req.body.email,
+          phone: req.body.phone,
           loggedInEmail: req.user?.email,
         });
         return reply.code(201).send({
