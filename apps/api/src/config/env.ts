@@ -24,8 +24,16 @@ const EnvSchema = z.object({
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  // Shiprocket — aggregator for Indian couriers. Pickup location is the
+  // name given to the warehouse address in Shiprocket dashboard (not an
+  // address). Webhook token is a free-form string we choose; we configure
+  // it in Shiprocket dashboard as `x-api-key` and verify on incoming
+  // webhook calls. Without creds the integration runs in stub mode
+  // (logs everything, returns mock data) so the full flow stays testable.
   SHIPROCKET_EMAIL: z.string().optional(),
   SHIPROCKET_PASSWORD: z.string().optional(),
+  SHIPROCKET_PICKUP_LOCATION: z.string().default('Primary'),
+  SHIPROCKET_WEBHOOK_TOKEN: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
 
   // Gate the email-OTP step at checkout. Default is "off" so local dev,

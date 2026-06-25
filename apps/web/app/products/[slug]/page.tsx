@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ProductGallery } from './_components/ProductGallery';
 import { AddToCartForm } from './_components/AddToCartForm';
+import { PincodeCheck } from '@/components/storefront/PincodeCheck';
 import { ProductTabs } from './_components/ProductTabs';
 import { env } from '@/lib/env';
 
@@ -127,6 +128,11 @@ export default async function ProductPage({ params }: PageProps) {
             </div>
 
             <AddToCartForm productId={product.id} maxQuantity={Math.min(product.stock, 10)} />
+
+            <PincodeCheck
+              className="mt-1"
+              weightKg={product.weight ? Number(product.weight) / 1000 : 0.5}
+            />
 
             <ul className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
               <li className="flex items-center gap-2">

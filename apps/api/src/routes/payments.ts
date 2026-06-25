@@ -3,6 +3,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { PaymentService } from '../services/payment.service.js';
 import { NotificationService } from '../services/notification.service.js';
+import { ShippingService } from '../services/shipping.service.js';
 import { serializeMoney } from '../lib/decimal.js';
 
 function mapPaymentError(err: unknown, reply: FastifyReply) {
@@ -22,6 +23,37 @@ const PayOrderParams = z.object({ orderId: z.string().uuid() });
 const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
   const service = new PaymentService(app.prisma);
   const notifications = new NotificationService(app.prisma);
+  const shipping = new ShippingService(app.prisma, notifications);
+
+  // Fire the Shiprocket push as fire-and-forget so a slow/failed
+  // courier-aggregator call can NEVER hold up the payment-confirm
+  // response. The push is idempotent — if it fails, an admin can
+  // retry via /api/admin/orders/:id/push-to-shiprocket.
+  function autoPushToShiprocket(orderId: string) {
+    void shipping
+      .pushOrder(orderId)
+      .then((res) => {
+        if (res.error) {
+          app.log.warn(
+            { orderId, error: res.error },
+            'shiprocket auto-push had an issue',
+          );
+        } else if (res.pushed) {
+          app.log.info(
+            {
+              orderId,
+              shipmentId: res.shipmentId,
+              awbCode: res.awbCode,
+              courier: res.courierName,
+            },
+            'shiprocket auto-push succeeded',
+          );
+        }
+      })
+      .catch((err) =>
+        app.log.error({ orderId, err }, 'shiprocket auto-push threw'),
+      );
+  }
 
   // -- Create a (mock) payment intent for an order -----------------------
   app.post(
@@ -66,6 +98,7 @@ const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
         const order = await service.confirmMock(req.params.orderId, req.body);
         if (req.body.success) {
           void notifications.sendOrderConfirmation(order.id);
+          autoPushToShiprocket(order.id);
         }
         return serializeMoney(order);
       } catch (err) {
@@ -88,6 +121,7 @@ const paymentRoutes: FastifyPluginAsyncZod = async (app) => {
       try {
         const order = await service.confirmCOD(req.params.orderId);
         void notifications.sendOrderConfirmation(order.id);
+        autoPushToShiprocket(order.id);
         return serializeMoney(order);
       } catch (err) {
         return mapPaymentError(err, reply);

@@ -141,6 +141,12 @@ model Product {
   costPrice       Decimal?      @map("cost_price") @db.Decimal(10, 2)
   taxRate         Decimal       @default(5.00) @map("tax_rate") @db.Decimal(5, 2) // GST %
   weight          Decimal?      @db.Decimal(8, 2) // grams, for shipping
+  // Package dimensions (cm) for Shiprocket courier rate quotes. Optional
+  // because the catalog seeded before this feature didn't carry them; we
+  // fall back to sensible defaults at quote time (see shipping.service.ts).
+  lengthCm        Decimal?      @map("length_cm") @db.Decimal(6, 2)
+  breadthCm       Decimal?      @map("breadth_cm") @db.Decimal(6, 2)
+  heightCm        Decimal?      @map("height_cm") @db.Decimal(6, 2)
   stock           Int           @default(0)
   lowStockAt      Int           @default(10) @map("low_stock_at")
   status          ProductStatus @default(DRAFT)
@@ -412,6 +418,11 @@ model OrderShipping {
   trackingUrl    String?   @map("tracking_url")
   awbCode        String?   @map("awb_code")
   shipmentId     String?   @map("shipment_id")
+  // Shiprocket internal order id (DISTINCT from our orderNumber). Needed
+  // for cancellation: their /orders/cancel endpoint takes their id, not
+  // ours. shipmentId is also Shiprocket's — kept generic above to leave
+  // room for swapping providers without renaming the column.
+  shiprocketOrderId String? @map("shiprocket_order_id")
   shippedAt      DateTime? @map("shipped_at")
   deliveredAt    DateTime? @map("delivered_at")
 

@@ -3,6 +3,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { OrderService } from '../../services/order.service.js';
 import { NotificationService } from '../../services/notification.service.js';
+import { ShippingService } from '../../services/shipping.service.js';
 import { serializeMoney } from '../../lib/decimal.js';
 
 const ListQuery = z.object({
@@ -66,6 +67,7 @@ function mapError(err: unknown, reply: FastifyReply) {
 const adminOrderRoutes: FastifyPluginAsyncZod = async (app) => {
   const orders = new OrderService(app.prisma);
   const notifications = new NotificationService(app.prisma);
+  const shipping = new ShippingService(app.prisma, notifications);
 
   // Read scope: SUPPORT / ORDER_MANAGER / MANAGER + ADMIN.
   app.register(async (admin: typeof app) => {
@@ -257,6 +259,36 @@ const adminOrderRoutes: FastifyPluginAsyncZod = async (app) => {
       async (req, reply) => {
         try {
           return serializeMoney(await orders.adminRefund(req.params.id, req.body));
+        } catch (err) {
+          return mapError(err, reply);
+        }
+      },
+    );
+
+    // Manual Shiprocket push — fallback for orders the auto-push at
+    // payment time failed on (Shiprocket down, wallet low, missing
+    // dimensions). Idempotent: re-pushing a successful order returns
+    // the existing shipment details without creating a duplicate.
+    admin.post(
+      '/api/admin/orders/:id/push-to-shiprocket',
+      {
+        schema: {
+          tags: ['admin', 'orders'],
+          summary: 'Push order to Shiprocket (manual retry / on-demand)',
+          params: IdParam,
+          security: [{ bearerAuth: [] }],
+        },
+      },
+      async (req, reply) => {
+        try {
+          const result = await shipping.pushOrder(req.params.id);
+          if (result.error && !result.shipmentId) {
+            return reply.status(502).send({
+              error: 'ShippingPushFailed',
+              message: result.error,
+            });
+          }
+          return result;
         } catch (err) {
           return mapError(err, reply);
         }
