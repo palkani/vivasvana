@@ -25,12 +25,9 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 60;
 
 async function getFeaturedProducts() {
-  // Belt-and-braces: never try to fetch in a build that has the localhost
-  // fallback baked in. Returns an empty list so the rest of the page can
-  // still render statically.
-  if (env.apiUrl.startsWith('http://localhost')) {
-    return [];
-  }
+  // The API is now served by this same app's route handlers and the page is
+  // force-dynamic, so we always fetch at request time. The try/catch keeps the
+  // page rendering even if the call fails.
   try {
     const res = await api.get<ProductListResponse>('/api/products?pageSize=3', {
       next: { revalidate: 60 },
@@ -43,7 +40,6 @@ async function getFeaturedProducts() {
 }
 
 async function getTestimonials(): Promise<Testimonial[]> {
-  if (env.apiUrl.startsWith('http://localhost')) return [];
   try {
     const res = await api.get<{ items: Testimonial[] }>('/api/testimonials?limit=3', {
       next: { revalidate: 300 },

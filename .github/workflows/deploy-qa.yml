@@ -2,12 +2,13 @@ name: Deploy → QA
 
 # Triggers on every push to `development`. Runs after CI passes, in order:
 #   1. Apply pending Prisma migrations to the QA Supabase project
-#   2. Deploy the Fastify API to the QA Railway service
-#   3. Deploy the Next.js storefront to the QA Vercel project
-#   4. Run smoke tests against the live URLs
+#   2. Deploy the Next.js storefront (which now also serves the API under
+#      /api/* as route handlers) to the QA Vercel project
+#   3. Run smoke tests against the live URL
 #
-# Each step gates on the previous — a migration failure means we never push
-# stale-schema code; an API failure means we don't deploy a web build that
+# The API is no longer a separate Railway service — it's part of the Next.js
+# app, so there's a single deploy target. Each step gates on the previous — a
+# migration failure means we never push
 # would call into a 500ing API.
 #
 # --- REQUIRED GITHUB SECRETS (scoped to the `qa` environment) -------------
@@ -18,19 +19,18 @@ name: Deploy → QA
 # VERCEL_TOKEN                  vercel.com/account/tokens
 # VERCEL_ORG_ID                 vercel project settings → general
 # VERCEL_PROJECT_ID             vercel project settings → general
-# RAILWAY_TOKEN                 railway.com → tokens → "Project Token" for QA
-# RAILWAY_SERVICE_ID            railway.com → service → settings → service id
+#
+# (No Railway secrets anymore — the API ships inside the Next.js app.)
 #
 # --- REQUIRED GITHUB VARIABLES (scoped to the `qa` environment) ----------
 # Settings → Environments → qa → Add variable (NOT secret — these are URLs)
 #
-# QA_WEB_URL                    https://qa.vivasvana.com
-# QA_API_URL                    https://api-qa.vivasvana.com
+# QA_WEB_URL                    https://qa.vivasvana.com   (also serves /api/*)
 #
 # --- TO SET UP ------------------------------------------------------------
-#   1. Disable Vercel + Railway native GitHub auto-deploy on the QA project.
+#   1. Disable Vercel native GitHub auto-deploy on the QA project.
 #      We orchestrate the order from this workflow.
-#   2. Settings → Environments → "qa" → add the 7 secrets + 2 variables above.
+#   2. Settings → Environments → "qa" → add the secrets + 1 variable above.
 #   3. Push to `development`. First run will take ~3 min; subsequent ~90 s.
 
 on:
@@ -97,53 +97,9 @@ jobs:
         # (CI injects env vars directly). Same prisma/seed.ts source.
         run: pnpm --filter @vivasvana/db exec tsx prisma/seed.ts
 
-  deploy-api:
-    name: Deploy API → Railway (QA)
-    needs: migrate
-    runs-on: ubuntu-latest
-    environment: qa
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Railway CLI
-        # `sh` on Ubuntu runners is dash (POSIX-strict). The Railway
-        # installer uses bashisms (parameter expansions like ${var,,}),
-        # so piping to `sh` fails with "Bad substitution". Force bash.
-        shell: bash
-        run: |
-          curl -fsSL https://railway.com/install.sh | bash
-          echo "$HOME/.railway/bin" >> "$GITHUB_PATH"
-      - name: Deploy
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        # --service forces this token to deploy the right service even if
-        # the project has multiple. --detach returns once Railway has the
-        # build queued; we don't wait for the runtime to come up here
-        # because the smoke-test job polls /health below.
-        run: |
-          railway up \
-            --service "${{ secrets.RAILWAY_SERVICE_ID }}" \
-            --detach
-
-      - name: Poll /health until healthy
-        # 90-second window for the new container to boot. Railway usually
-        # flips traffic within 30 s. If we never see a 200 the smoke job
-        # will fail anyway — this just produces a clearer error message.
-        run: |
-          for i in $(seq 1 18); do
-            code=$(curl -sS -o /dev/null -w "%{http_code}" "${{ vars.QA_API_URL }}/health" || true)
-            if [ "$code" = "200" ]; then
-              echo "::notice::API healthy after ${i}× 5s polls"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "::error::API /health never returned 200 within 90 s"
-          exit 1
-
   deploy-web:
     name: Deploy Web → Vercel (QA)
-    needs: deploy-api
+    needs: migrate
     runs-on: ubuntu-latest
     environment: qa
     timeout-minutes: 10
@@ -188,7 +144,8 @@ jobs:
       - id: urls
         run: |
           echo "web_url=${{ vars.QA_WEB_URL }}" >> "$GITHUB_OUTPUT"
-          echo "api_url=${{ vars.QA_API_URL }}" >> "$GITHUB_OUTPUT"
+          # The API now lives under the web origin (/api/*), so api_url == web_url.
+          echo "api_url=${{ vars.QA_WEB_URL }}" >> "$GITHUB_OUTPUT"
 
   smoke:
     name: Smoke tests
@@ -200,7 +157,7 @@ jobs:
 
   notify-failure:
     name: Mark deploy failed
-    needs: [migrate, deploy-api, deploy-web, collect-urls, smoke]
+    needs: [migrate, deploy-web, collect-urls, smoke]
     if: failure()
     runs-on: ubuntu-latest
     steps:
@@ -211,6 +168,6 @@ jobs:
             echo "Commit: \`${{ github.sha }}\`"
             echo "Author: ${{ github.actor }}"
             echo ""
-            echo "Roll back from the Railway and Vercel dashboards if the"
-            echo "live QA env is in a broken state."
+            echo "Roll back from the Vercel dashboard if the live QA env is"
+            echo "in a broken state."
           } >> "$GITHUB_STEP_SUMMARY"

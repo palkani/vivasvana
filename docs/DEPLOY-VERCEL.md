@@ -38,41 +38,34 @@ In Project Settings → Environment Variables, add:
 | `NEXT_PUBLIC_SUPABASE_URL` | Same as SUPABASE_URL | Production + Preview |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Same as SUPABASE_ANON_KEY | Production + Preview |
 | `NEXT_PUBLIC_SITE_URL` | `https://your-vercel-url.vercel.app` | Production + Preview |
-| `NEXT_PUBLIC_API_URL` | URL where your Fastify API runs (see step 3) | Production + Preview |
-| `API_URL` | Same as NEXT_PUBLIC_API_URL | Production + Preview |
-| `REDIS_URL` | Upstash Redis URL (free tier OK) | Production + Preview |
 
-## 3. The API is NOT deployed by this step
+Server-side integrations the API route handlers use (all optional — each
+degrades to a dev/stub mode when absent): `RESEND_API_KEY`,
+`SHIPROCKET_EMAIL` / `SHIPROCKET_PASSWORD` / `SHIPROCKET_PICKUP_LOCATION` /
+`SHIPROCKET_WEBHOOK_TOKEN`, `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` /
+`TWILIO_FROM_NUMBER` (or `TWILIO_MESSAGING_SERVICE_SID`), `REQUIRE_ORDER_OTP`.
 
-`apps/api` is a Fastify long-running process — **Vercel can't host it** (Vercel only runs serverless functions and Next.js). You have three options:
+> **No `NEXT_PUBLIC_API_URL`, `API_URL`, or `REDIS_URL` anymore.** The API is
+> part of this Next.js app and is same-origin, and the only Redis use (a PIN
+> cache) is now an in-process cache.
 
-### Option A — Deploy `apps/api` to Railway (recommended)
+## 3. The API ships WITH this app — nothing extra to deploy
 
-```bash
-# In a new Railway project:
-# 1. Connect this repo
-# 2. Set Root Directory to `apps/api`
-# 3. Build Command: cd ../.. && pnpm install && pnpm --filter @vivasvana/db generate && pnpm --filter @vivasvana/api build
-# 4. Start Command: pnpm --filter @vivasvana/api start
-# 5. Add the same env vars from step 2 above (minus the NEXT_PUBLIC_* ones)
-# 6. Add API_PORT=4000 and API_HOST=0.0.0.0
-```
+The backend used to be a separate Fastify service on Railway. It has been
+migrated into Next.js **route handlers** under `apps/web/app/api/**`, so it
+deploys as Vercel serverless functions alongside the storefront in the same
+build. There is **no second service, no Railway, no Redis** to stand up.
 
-Railway gives you a `https://your-api.up.railway.app` URL. Set that as `NEXT_PUBLIC_API_URL` and `API_URL` in Vercel.
+- Browser calls hit `/api/*` on the same origin (cart cookies stay
+  first-party — the old cross-site proxy is gone).
+- Server components self-fetch the same `/api/*` routes via the deployment
+  origin (`VERCEL_URL`), or you can import the service functions in
+  `apps/web/lib/server/services/**` directly to skip the HTTP hop.
 
-### Option B — Use Render / Fly / Heroku
-
-Same shape as Railway. You need a host that runs a long-lived Node process.
-
-### Option C — Skip the API for now (Vercel-only smoke test)
-
-If you just want the storefront to render without working cart/checkout, set:
-
-```
-NEXT_PUBLIC_API_URL=https://your-vercel-url.vercel.app/api-not-deployed
-```
-
-Pages that call the API will gracefully fall back to their empty states (the home page already does this — see the "Products will appear here once the API is reachable" message in `apps/web/app/page.tsx`).
+If you ever add genuinely long-running work (background jobs beyond the
+serverless timeout, persistent WebSockets, queue/cron workers), THAT is when
+a separate service is warranted — not for the standard request/response
+endpoints that live here.
 
 ## 4. Database
 
@@ -86,7 +79,7 @@ You need a cloud Postgres. Easiest path:
    pnpm db:migrate
    pnpm db:seed
    ```
-3. Use the same `DATABASE_URL` / `DIRECT_URL` in Vercel and Railway.
+3. Use the same `DATABASE_URL` / `DIRECT_URL` in Vercel (one deploy target now).
 
 ## 5. Triggering the deploy
 
@@ -103,8 +96,8 @@ Or in the Vercel dashboard: **Deployments → Redeploy** (use "Clear build cache
 | Symptom | Fix |
 |---|---|
 | 404 on every route | `outputDirectory` mismatch — verify `vercel.json` is at repo root and committed |
-| 404 only on `/cart`, `/checkout`, `/account/*` | Env var missing or wrong: `NEXT_PUBLIC_SUPABASE_*` or `NEXT_PUBLIC_API_URL` |
-| 404 on `/products/[slug]` | API not reachable from Vercel — check `NEXT_PUBLIC_API_URL` and CORS allowlist on the API (set `API_CORS_ORIGINS` to your Vercel URL) |
+| 404 only on `/cart`, `/checkout`, `/account/*` | Env var missing or wrong: `NEXT_PUBLIC_SUPABASE_*` |
+| 500 on `/api/*` or `/products/[slug]` | A server-side env var the route handlers need is missing (`DATABASE_URL`, `SUPABASE_JWT_SECRET`, etc.) — check the Functions logs |
 | 500 on `/admin/*` | Middleware can't reach Supabase — check `NEXT_PUBLIC_SUPABASE_URL` |
 
 ## Build output verification

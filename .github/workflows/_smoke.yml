@@ -26,9 +26,9 @@ jobs:
       - name: API health
         run: |
           set -e
-          code=$(curl -sS -o /tmp/health -w "%{http_code}" "${{ inputs.api_url }}/health")
-          [ "$code" = "200" ] || { echo "::error::API /health → $code"; cat /tmp/health; exit 1; }
-          echo "::notice::API /health → 200"
+          code=$(curl -sS -o /tmp/health -w "%{http_code}" "${{ inputs.api_url }}/api/health")
+          [ "$code" = "200" ] || { echo "::error::API /api/health → $code"; cat /tmp/health; exit 1; }
+          echo "::notice::API /api/health → 200"
 
       - name: API catalog returns ≥ 1 product
         run: |

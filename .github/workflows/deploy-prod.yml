@@ -18,13 +18,12 @@ name: Deploy → Production
 # VERCEL_TOKEN
 # VERCEL_ORG_ID
 # VERCEL_PROJECT_ID             prod Vercel project (separate from QA)
-# RAILWAY_TOKEN                 prod Railway project token
-# RAILWAY_SERVICE_ID            prod Railway service id
+#
+# (No Railway secrets anymore — the API ships inside the Next.js app.)
 #
 # --- REQUIRED ENVIRONMENT VARIABLES (Settings → Environments → production)
 #
-# PROD_WEB_URL                  https://vivasvana.com
-# PROD_API_URL                  https://api.vivasvana.com
+# PROD_WEB_URL                  https://vivasvana.com   (also serves /api/*)
 
 on:
   push:
@@ -94,47 +93,9 @@ jobs:
       - name: Apply pending migrations
         run: pnpm --filter @vivasvana/db run migrate:deploy
 
-  deploy-api:
-    name: Deploy API → Railway (Production)
-    needs: migrate
-    runs-on: ubuntu-latest
-    environment: production
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.ref || github.ref }}
-      - name: Install Railway CLI
-        # See deploy-qa.yml for the dash-vs-bash explanation.
-        shell: bash
-        run: |
-          curl -fsSL https://railway.com/install.sh | bash
-          echo "$HOME/.railway/bin" >> "$GITHUB_PATH"
-      - name: Deploy
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: |
-          railway up \
-            --service "${{ secrets.RAILWAY_SERVICE_ID }}" \
-            --detach
-
-      - name: Poll /health until healthy
-        run: |
-          for i in $(seq 1 24); do  # 24 × 5 s = 2 min — prod sometimes
-                                    # boots slower under load
-            code=$(curl -sS -o /dev/null -w "%{http_code}" "${{ vars.PROD_API_URL }}/health" || true)
-            if [ "$code" = "200" ]; then
-              echo "::notice::API healthy after ${i}× 5s polls"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "::error::API /health never returned 200 within 2 min"
-          exit 1
-
   deploy-web:
     name: Deploy Web → Vercel (Production)
-    needs: deploy-api
+    needs: migrate
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 10
@@ -173,7 +134,8 @@ jobs:
       - id: urls
         run: |
           echo "web_url=${{ vars.PROD_WEB_URL }}" >> "$GITHUB_OUTPUT"
-          echo "api_url=${{ vars.PROD_API_URL }}" >> "$GITHUB_OUTPUT"
+          # API ships inside the web app under /api/*, so api_url == web_url.
+          echo "api_url=${{ vars.PROD_WEB_URL }}" >> "$GITHUB_OUTPUT"
 
   smoke:
     name: Smoke tests
@@ -207,7 +169,7 @@ jobs:
 
   notify-failure:
     name: Mark deploy failed
-    needs: [migrate, deploy-api, deploy-web, collect-urls, smoke]
+    needs: [migrate, deploy-web, collect-urls, smoke]
     if: failure()
     runs-on: ubuntu-latest
     steps:
@@ -219,9 +181,9 @@ jobs:
             echo "Author: ${{ github.actor }}"
             echo ""
             echo "### Next steps"
-            echo "1. Open Vercel → roll back to the previous deployment if web is broken"
-            echo "2. Open Railway → redeploy the previous build if API is broken"
-            echo "3. If a migration applied but the deploy failed, the DB is now ahead"
+            echo "1. Open Vercel → roll back to the previous deployment (web + API"
+            echo "   ship together now, so one rollback covers both)"
+            echo "2. If a migration applied but the deploy failed, the DB is now ahead"
             echo "   of the deployed code — consider rolling FORWARD with a hotfix"
             echo "   rather than reverting migrations"
           } >> "$GITHUB_STEP_SUMMARY"

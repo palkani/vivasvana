@@ -34,27 +34,11 @@ const config: NextConfig = {
     ],
   },
   transpilePackages: ['@vivasvana/db'],
-  // Same-origin proxy to the Railway API. Without this, every cart
-  // fetch is cross-site (vercel.app → up.railway.app), the response
-  // Set-Cookie is a third-party cookie, and modern browsers (Chrome
-  // w/ Privacy Sandbox, Safari ITP, Firefox TCP) drop it silently.
-  // Net effect: cart session never persists, "added to cart" succeeds
-  // but the next GET /api/cart finds an empty bag.
-  //
-  // With this rewrite, the browser only ever talks to vivasvana.vercel.app
-  // for /api/* — Vercel's edge proxies to Railway. The Set-Cookie comes
-  // back from a same-origin response, so the browser stores it as a
-  // first-party cookie and sends it on every subsequent request.
-  //
-  // Server-side fetches (RSC, server actions) still hit Railway directly
-  // via lib/api.ts since they're not subject to browser cookie policy.
-  async rewrites() {
-    const upstream = process.env.NEXT_PUBLIC_API_URL ?? '';
-    if (!upstream || upstream.startsWith('http://localhost')) return [];
-    return [
-      { source: '/api/:path*', destination: `${upstream}/api/:path*` },
-    ];
-  },
+  // No proxy rewrite anymore: the API is served by this app's own route
+  // handlers under app/api/**, so /api/* is already same-origin. Cart
+  // Set-Cookie comes back first-party for free, and there's no Railway
+  // upstream to forward to. (This is exactly the cross-site cookie problem
+  // the old rewrite existed to work around — now structurally gone.)
   async headers() {
     return [
       {

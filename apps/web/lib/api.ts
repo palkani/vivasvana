@@ -8,6 +8,17 @@ import { env } from './env';
  * { cookie } from `next/headers`. Browser fetches send cookies automatically.
  */
 
+/**
+ * Resolve this deployment's own origin for server-side self-fetches to the
+ * /api route handlers. On Vercel, VERCEL_URL is the deployment host (no
+ * scheme); locally we fall back to NEXT_PUBLIC_SITE_URL.
+ */
+function serverOrigin(): string {
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel) return vercel.startsWith('http') ? vercel : `https://${vercel}`;
+  return env.siteUrl;
+}
+
 export interface ApiError extends Error {
   status: number;
   payload: unknown;
@@ -25,16 +36,18 @@ interface RequestOptions extends RequestInit {
 }
 
 async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  // Browser: use a RELATIVE URL so the request goes to our own origin
-  // (vivasvana.vercel.app/api/...) and gets transparently proxied to
-  // Railway by the next.config rewrite. This makes cart cookies
-  // first-party — without it they get dropped as third-party.
+  // The API now lives in THIS Next app as route handlers under /api/*, so
+  // every call is same-origin — no Railway, no proxy rewrite.
   //
-  // Server (RSC, server actions): need an absolute URL because there's
-  // no "origin" to be relative to. Use the configured Railway URL —
-  // server-side fetches aren't subject to browser cookie policy.
+  // Browser: RELATIVE URL so the request hits our own origin and cart cookies
+  // stay first-party.
+  //
+  // Server (RSC, server actions): fetch() needs an absolute URL, so resolve
+  // our own deployment origin. This is a self-fetch to our own /api handlers.
+  // (Follow-up optimization: RSC could import the service functions directly
+  // and skip the HTTP hop entirely.)
   const isServer = typeof window === 'undefined';
-  const base = isServer ? env.apiUrl : '';
+  const base = isServer ? serverOrigin() : '';
   const url = path.startsWith('http') ? path : `${base}${path}`;
   const headers = new Headers(options.headers);
   headers.set('Accept', 'application/json');
