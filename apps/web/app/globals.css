@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 40% 98%;
+    --foreground: 30 25% 12%;
+
+    --card: 40 40% 99%;
+    --card-foreground: 30 25% 12%;
+
+    --primary: 32 55% 48%;       /* brand-500 */
+    --primary-foreground: 40 50% 98%;
+
+    --secondary: 110 35% 33%;    /* leaf-500 */
+    --secondary-foreground: 40 50% 98%;
+
+    --muted: 40 30% 94%;
+    --muted-foreground: 30 12% 40%;
+
+    --accent: 40 30% 92%;
+    --accent-foreground: 30 25% 12%;
+
+    --destructive: 0 70% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 20% 88%;
+    --input: 30 20% 88%;
+    --ring: 32 55% 48%;
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+  /* Defense-in-depth against horizontal scroll: any errant element that
+     overflows its parent gets clipped at the viewport instead of widening
+     the document. Individual scrollable regions still work (they set
+     overflow-x explicitly on themselves). */
+  html,
+  body {
+    @apply bg-background text-foreground antialiased;
+    overflow-x: hidden;
+  }
+  body {
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+  /* Long unbreakable strings (URLs, hashes, long product titles without
+     spaces) shouldn't blow out their container — wrap them. */
+  p, h1, h2, h3, h4, h5, h6, span, a {
+    overflow-wrap: anywhere;
+  }
+
+  /* Fraunces tuning: the SOFT axis (0-100, default 0) rounds the terminals.
+     A small bump warms the typeface for our wellness/Ayurveda brand voice
+     without losing the editorial serif gravitas. opsz auto-tracks
+     font-size in modern browsers, so we don't override that here. */
+  .font-serif {
+    font-feature-settings: 'kern', 'liga';
+    font-variation-settings: 'SOFT' 30;
+  }
+  /* Negative tracking on big headlines makes the curves breathe instead of
+     drifting apart at scale. */
+  h1.font-serif,
+  h2.font-serif {
+    letter-spacing: -0.018em;
+  }
+}
+
+@layer utilities {
+  .container-narrow {
+    @apply mx-auto w-full max-w-3xl px-4;
+  }
+
+  /* Cross-browser hidden scrollbar — keeps scroll functional. */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Horizontal infinite marquee.
+   * Requirements for a seamless loop:
+   *   1. The animated track contains the items list TWICE
+   *   2. Track width is intrinsic (w-max) so the children dictate size
+   *   3. Animation translates from 0 → -50% (one full copy) over its duration
+   * Result: when the first copy ends, the second copy is in the same visual
+   * position as the first started — looks like an endless conveyor.
+   */
+  @keyframes marquee-x {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  .animate-marquee {
+    animation: marquee-x var(--marquee-duration, 30s) linear infinite;
+    animation-play-state: running;
+    will-change: transform;
+  }
+  .animate-marquee:hover {
+    animation-play-state: paused;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-marquee {
+      animation: none;
+    }
+  }
+}

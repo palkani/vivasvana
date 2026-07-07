@@ -1,0 +1,54 @@
+# Shave the Docker build context. Anything Railway / docker build doesn't
+# need to send to the daemon goes here — speeds up cold builds significantly
+# and avoids accidentally copying secrets or stale node_modules.
+
+# Local toolchain output
+node_modules
+**/node_modules
+.pnpm-store
+**/.pnpm-store
+.turbo
+**/.turbo
+dist
+**/dist
+.next
+**/.next
+out
+**/out
+build
+**/build
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+!.env.supabase.example
+
+# Tests + IDE
+coverage
+**/coverage
+playwright-report
+**/playwright-report
+test-results
+**/test-results
+.vscode
+.idea
+.cursor
+*.swp
+
+# Git + CI we don't need at build time
+.git
+.github
+.husky
+
+# Docs / OS
+*.md
+!apps/api/README.md
+.DS_Store
+
+# Backups
+*.bak
+.env.*.bak
+
+# Claude / local agent state
+.claude

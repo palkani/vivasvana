@@ -1,0 +1,52 @@
+{
+  "name": "@vivasvana/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "// dev": "source-on-condition — tsx + Vitest + Next dev enable --conditions=development",
+      "// prod": "compiled .js for plain Node runtime in the API container",
+      "types": "./dist/index.d.ts",
+      "development": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "development": "./src/types.ts",
+      "default": "./dist/types.js"
+    }
+  },
+  "scripts": {
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "generate": "prisma generate",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:reset": "prisma migrate reset --force",
+    "reset": "prisma migrate reset --force && pnpm seed",
+    "seed": "tsx --env-file=.env prisma/seed.ts",
+    "promote-admin": "tsx --env-file=.env scripts/promote-admin.ts",
+    "setup-storage": "tsx --env-file=.env scripts/setup-storage.ts",
+    "studio": "prisma studio",
+    "format": "prisma format",
+    "lint": "echo 'no-op'",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'no-op'",
+    "clean": "rm -rf node_modules .turbo"
+  },
+  "dependencies": {
+    "@prisma/client": "5.20.0"
+  },
+  "devDependencies": {
+    "@vivasvana/config": "workspace:*",
+    "prisma": "5.20.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2",
+    "@types/node": "^20.14.0"
+  },
+  "prisma": {
+    "seed": "tsx --env-file=.env prisma/seed.ts"
+  }
+}
