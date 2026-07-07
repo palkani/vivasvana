@@ -12,7 +12,6 @@ import { ProductCard } from '@/components/storefront/ProductCard';
 import { TestimonialsRow, type Testimonial } from '@/components/storefront/TestimonialsRow';
 import { NewsletterBand } from '@/components/storefront/NewsletterBand';
 import { api } from '@/lib/api';
-import { env } from '@/lib/env';
 import type { ProductListResponse } from '@/lib/types';
 
 // Render at request time, not at build. Prerendering at build needed the
@@ -32,7 +31,10 @@ async function getFeaturedProducts() {
     const res = await api.get<ProductListResponse>('/api/products?pageSize=3', {
       next: { revalidate: 60 },
     });
-    return res.items;
+    // Defensive: never return a non-array. If the API is unreachable or a
+    // proxy/edge layer hands back a non-JSON body, `res?.items` can be
+    // undefined — returning it would crash the page on `.slice`/`.map`.
+    return Array.isArray(res?.items) ? res.items : [];
   } catch (err) {
     console.error('Failed to load featured products', err);
     return [];
@@ -44,7 +46,7 @@ async function getTestimonials(): Promise<Testimonial[]> {
     const res = await api.get<{ items: Testimonial[] }>('/api/testimonials?limit=3', {
       next: { revalidate: 300 },
     });
-    return res.items;
+    return Array.isArray(res?.items) ? res.items : [];
   } catch {
     return [];
   }
@@ -80,12 +82,12 @@ const PILLARS = [
 export default async function HomePage() {
   const [products, testimonials] = await Promise.all([getFeaturedProducts(), getTestimonials()]);
 
-  const heroImages = products
+  const heroImages = (products ?? [])
     .slice(0, 2)
     .map((p) => ({
-      url: p.images[0]?.url ?? '',
-      alt: p.title,
-      slug: p.slug,
+      url: p.images?.[0]?.url ?? '',
+      alt: p.title ?? '',
+      slug: p.slug ?? '',
     }))
     .filter((p) => p.url);
 
