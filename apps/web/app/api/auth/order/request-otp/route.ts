@@ -4,6 +4,7 @@ import { AuthService } from '@/lib/server/services/auth.service';
 import { OtpService } from '@/lib/server/services/otp.service';
 import { route, parseBody, json } from '@/lib/server/http';
 import { optionalAuth } from '@/lib/server/auth';
+import { rateLimit, clientIp } from '@/lib/server/rate-limit';
 import { mapAuthError } from '../../_lib/map-error';
 
 export const runtime = 'nodejs';
@@ -21,6 +22,7 @@ const OrderOtpBody = z.object({
 // order"; the returned email is the address the OTP went to (also the order's
 // confirmation address). Uses optionalAuth so logged-in shoppers are honoured.
 export const POST = route(async (req) => {
+  rateLimit(`order-otp:${clientIp(req)}`, 5, 10 * 60 * 1000);
   const user = await optionalAuth(req);
   const body = await parseBody(req, OrderOtpBody);
   const service = new AuthService(prisma, new OtpService(prisma));

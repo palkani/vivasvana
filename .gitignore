@@ -74,3 +74,4 @@ supabase/.temp
 
 # Claude Code workspace config
 .claude/
+.env*.local

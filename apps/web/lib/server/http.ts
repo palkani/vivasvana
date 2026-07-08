@@ -40,12 +40,16 @@ export function json<T>(data: T, init?: ResponseInit): NextResponse {
 }
 
 /**
- * Mirrors the old plugin's EXPOSE_ERROR_DETAILS behaviour: 500s carry the
- * error name/code/message (never a stack) unless explicitly suppressed in
- * prod by setting EXPOSE_ERROR_DETAILS=false.
+ * Secure default: in PRODUCTION we never leak internal error details
+ * (Prisma messages, connection strings, driver internals) to the client —
+ * they only ever go to the server logs. Outside production the detail is
+ * included to keep local/preview debugging fast. To temporarily diagnose a
+ * live prod issue, set EXPOSE_ERROR_DETAILS=true on the deployment.
  */
 function detailsIfExposed(err: unknown): Record<string, unknown> {
-  if (process.env.EXPOSE_ERROR_DETAILS === 'false') return {};
+  const expose =
+    process.env.EXPOSE_ERROR_DETAILS === 'true' || process.env.NODE_ENV !== 'production';
+  if (!expose) return {};
   if (!(err instanceof Error)) return { detail: { type: typeof err } };
   const detail: Record<string, unknown> = { name: err.name, message: err.message };
   if ('code' in err && typeof err.code === 'string') detail.code = err.code;
