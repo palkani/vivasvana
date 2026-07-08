@@ -92,10 +92,12 @@ export function CartView({ initialCart }: Props) {
           {count} {pluralize(count, 'item')} in cart
         </p>
 
-        {items.map((item) => {
+        {items
+          .filter((item) => item?.product && Array.isArray(item.product.images))
+          .map((item) => {
           const image = item.product.images[0];
           const maxStock = item.variant?.stock ?? item.product.stock;
-          const lineTotal = parseFloat(item.price) * item.quantity;
+          const lineTotal = parseFloat(item.price) * (Number(item.quantity) || 0);
           return (
             <Card key={item.id}>
               {/* Mobile: image + details stack as a row, controls + price wrap

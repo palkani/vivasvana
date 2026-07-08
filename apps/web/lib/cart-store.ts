@@ -86,12 +86,14 @@ export const useCartStore = create<CartState>()(
       },
     }),
     {
-      // Bumped key — users who carry stale snapshots from before the
-      // proxy + Date-serialization fixes had `cart.items` populated with
-      // shapes (timestamps as `{}`, third-party-blocked sessions) that
-      // could throw on hydration. New key = fresh state; the old key's
-      // data is left in localStorage but never read.
-      name: 'vv_cart_snapshot_v2',
+      // Bumped key (v3) — stale v2 snapshots from the Railway→Vercel
+      // migration debugging held malformed `cart.items` (missing `product`,
+      // timestamps as `{}`) that crashed CartView's render on hydration
+      // ("Cannot read properties of undefined (reading 'images')"). A new
+      // key means every browser starts from a clean snapshot; the server
+      // fetch on mount repopulates it. CartView also now filters malformed
+      // items defensively, so a bad snapshot can never take the page down.
+      name: 'vv_cart_snapshot_v3',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({ cart: state.cart }),
     },
