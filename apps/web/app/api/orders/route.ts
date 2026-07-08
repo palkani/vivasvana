@@ -95,22 +95,21 @@ function mapServiceError(err: unknown): never {
 export { mapServiceError };
 
 /**
- * Read (or mint + set) the cart session cookie. Mirrors the Fastify route's
- * `ensureSessionCookie`: same name (`vv_cart_sid`), same cross-site options in
- * production (sameSite:'none', secure), 30-day maxAge.
+ * Read (or mint + set) the cart session cookie. Must match the cart routes'
+ * cookie exactly: same name (`vv_cart_sid`), `SameSite=Lax` (the API is
+ * same-origin now — None gets dropped by browser third-party-cookie
+ * protections), Secure in prod, 30-day maxAge.
  */
 async function ensureSessionCookie(): Promise<string> {
   const jar = await cookies();
   let sid = jar.get(SESSION_COOKIE)?.value;
   if (!sid) {
     sid = randomUUID();
-    const prod = process.env.NODE_ENV === 'production';
     jar.set(SESSION_COOKIE, sid, {
       path: '/',
       httpOnly: true,
-      // Cross-site cart cookie — see cart.ts for the full reasoning.
-      sameSite: prod ? 'none' : 'lax',
-      secure: prod,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24 * 30,
     });
   }

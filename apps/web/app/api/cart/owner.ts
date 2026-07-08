@@ -16,17 +16,21 @@ const SESSION_COOKIE = 'vv_cart_sid';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
 /**
- * Cross-site cookie flags (matches Fastify `crossSiteCookieFlags`):
- * In prod the web + API used to be different registrable domains, so the
- * cookie needed SameSite=None;Secure to ride along on cross-site fetches.
- * Now same-origin, but we keep identical flags so behaviour is unchanged.
- * Local dev (non-HTTPS) keeps Lax + non-Secure.
+ * Cart session cookie flags. The API is now SAME-ORIGIN with the storefront,
+ * so the cookie must be `SameSite=Lax` — NOT `None`.
+ *
+ * `SameSite=None` is only for genuine cross-site cookies, and modern browsers
+ * (Chrome's third-party-cookie phase-out, Safari ITP, Brave) block or
+ * partition None cookies. That silently dropped `vv_cart_sid` in the browser,
+ * so every `/api/cart` read started a fresh empty session → "your cart is
+ * empty" even right after adding an item. Lax is sent on same-origin requests
+ * and top-level navigations, which is exactly the cart flow. Secure in prod
+ * (HTTPS); relaxed in local dev over http.
  */
-function crossSiteCookieFlags() {
-  const prod = process.env.NODE_ENV === 'production';
+function cartCookieFlags() {
   return {
-    sameSite: prod ? ('none' as const) : ('lax' as const),
-    secure: prod,
+    sameSite: 'lax' as const,
+    secure: process.env.NODE_ENV === 'production',
   };
 }
 
@@ -51,7 +55,7 @@ export async function resolveCartOwner(
     jar.set(SESSION_COOKIE, sid, {
       path: '/',
       httpOnly: true,
-      ...crossSiteCookieFlags(),
+      ...cartCookieFlags(),
       maxAge: SESSION_MAX_AGE,
     });
   }
