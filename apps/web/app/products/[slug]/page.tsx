@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Leaf, Sprout, Truck, MapPin } from 'lucide-react';
-import { api, type ApiError } from '@/lib/api';
+import { getProductBySlug } from '@/lib/server/storefront-data';
 import type { ProductDetail } from '@/lib/types';
 import { formatINR } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -18,12 +18,9 @@ interface PageProps {
 }
 
 async function fetchProduct(slug: string): Promise<ProductDetail | null> {
-  try {
-    return await api.get<ProductDetail>(`/api/products/${slug}`, { next: { revalidate: 60 } });
-  } catch (err) {
-    if ((err as ApiError).status === 404) return null;
-    throw err;
-  }
+  // Read the DB directly (no self-fetch over HTTP). getProductBySlug returns
+  // null for a missing/unpublished product → the caller renders notFound().
+  return getProductBySlug(slug);
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {

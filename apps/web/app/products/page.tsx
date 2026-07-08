@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { ProductCard } from '@/components/storefront/ProductCard';
-import { api } from '@/lib/api';
+import { listProducts } from '@/lib/server/storefront-data';
 import type { ProductListResponse } from '@/lib/types';
 import { ProductsFilterBar } from './_components/ProductsFilterBar';
 
@@ -26,14 +26,14 @@ export default async function ProductsPage({ searchParams }: PageProps) {
   const sort: Sort = VALID_SORTS.includes(sp.sort as Sort) ? (sp.sort as Sort) : 'newest';
   const page = Math.max(1, Number(sp.page ?? '1') || 1);
 
-  const params = new URLSearchParams({ sort, page: String(page), pageSize: '12' });
-  if (sp.minPrice) params.set('minPrice', sp.minPrice);
-  if (sp.maxPrice) params.set('maxPrice', sp.maxPrice);
-
   let data: ProductListResponse;
   try {
-    data = await api.get<ProductListResponse>(`/api/products?${params.toString()}`, {
-      next: { revalidate: 60 },
+    data = await listProducts({
+      sort,
+      page,
+      pageSize: 12,
+      minPrice: sp.minPrice ? Number(sp.minPrice) : undefined,
+      maxPrice: sp.maxPrice ? Number(sp.maxPrice) : undefined,
     });
   } catch {
     data = { items: [], total: 0, page, pageSize: 12 };

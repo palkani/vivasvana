@@ -11,8 +11,7 @@ import { HeroBanner } from '@/components/storefront/HeroBanner';
 import { ProductCard } from '@/components/storefront/ProductCard';
 import { TestimonialsRow, type Testimonial } from '@/components/storefront/TestimonialsRow';
 import { NewsletterBand } from '@/components/storefront/NewsletterBand';
-import { api } from '@/lib/api';
-import type { ProductListResponse } from '@/lib/types';
+import { listProducts, listTestimonials } from '@/lib/server/storefront-data';
 
 // Render at request time, not at build. Prerendering at build needed the
 // API to be reachable from the Vercel build runner — when it wasn't
@@ -24,16 +23,10 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 60;
 
 async function getFeaturedProducts() {
-  // The API is now served by this same app's route handlers and the page is
-  // force-dynamic, so we always fetch at request time. The try/catch keeps the
-  // page rendering even if the call fails.
+  // Read the DB directly from the RSC. try/catch keeps the page rendering
+  // even if the query fails.
   try {
-    const res = await api.get<ProductListResponse>('/api/products?pageSize=3', {
-      next: { revalidate: 60 },
-    });
-    // Defensive: never return a non-array. If the API is unreachable or a
-    // proxy/edge layer hands back a non-JSON body, `res?.items` can be
-    // undefined — returning it would crash the page on `.slice`/`.map`.
+    const res = await listProducts({ pageSize: 3 });
     return Array.isArray(res?.items) ? res.items : [];
   } catch (err) {
     console.error('Failed to load featured products', err);
@@ -43,10 +36,8 @@ async function getFeaturedProducts() {
 
 async function getTestimonials(): Promise<Testimonial[]> {
   try {
-    const res = await api.get<{ items: Testimonial[] }>('/api/testimonials?limit=3', {
-      next: { revalidate: 300 },
-    });
-    return Array.isArray(res?.items) ? res.items : [];
+    const items = await listTestimonials(3);
+    return (Array.isArray(items) ? items : []) as unknown as Testimonial[];
   } catch {
     return [];
   }

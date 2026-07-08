@@ -40,14 +40,11 @@ export function AuthForm({ redirectTo }: Props) {
 
   async function mergeGuestCart(accessToken: string) {
     try {
-      const guestCookie = document.cookie
-        .split(';')
-        .map((c) => c.trim().split('='))
-        .find(([k]) => k === 'vv_cart_sid');
-      const sessionId = guestCookie?.[1];
-      if (sessionId) {
-        await api.post<Cart>('/api/cart/merge', { sessionId }, { accessToken });
-      }
+      // The guest session id is in the HttpOnly `vv_cart_sid` cookie, which
+      // the browser sends automatically on this same-origin request and the
+      // server reads itself. (JS can't read HttpOnly cookies, which is why the
+      // old document.cookie approach always found nothing and lost the cart.)
+      await api.post<Cart>('/api/cart/merge', {}, { accessToken });
     } catch {
       // Non-fatal — guest cart preserved client-side either way.
     }

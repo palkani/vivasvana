@@ -69,7 +69,7 @@ export class AuthService {
     // a Twilio outage (or missing creds in dev) must NOT block signup.
     // sendSms already handles invalid numbers + missing creds gracefully.
     if (args.phone) {
-      void sendSms({
+      await sendSms({
         to: args.phone,
         body: renderOtpSms({
           code: issued.code,
@@ -199,7 +199,7 @@ export class AuthService {
     // forget pattern as signup — a checkout in flight is the worst
     // possible time to fail-hard on a Twilio hiccup.
     if (args.phone) {
-      void sendSms({
+      await sendSms({
         to: args.phone,
         body: renderOtpSms({
           code: issued.code,

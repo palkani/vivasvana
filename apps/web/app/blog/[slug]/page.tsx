@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import { api } from '@/lib/api';
+import { getBlogPost } from '@/lib/server/storefront-data';
 import { renderMarkdown } from '@/lib/markdown';
 
 interface BlogPost {
@@ -27,9 +27,7 @@ interface PageProps {
 
 async function fetchPost(slug: string): Promise<BlogPost | null> {
   try {
-    return await api.get<BlogPost>(`/api/blog/${encodeURIComponent(slug)}`, {
-      next: { revalidate: 60 },
-    });
+    return (await getBlogPost(slug)) as unknown as BlogPost | null;
   } catch {
     return null;
   }

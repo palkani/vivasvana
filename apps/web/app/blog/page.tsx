@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { api } from '@/lib/api';
+import { listBlog } from '@/lib/server/storefront-data';
 
 export const metadata: Metadata = {
   title: 'Blog — Vivasvana',
@@ -35,14 +35,9 @@ export default async function BlogIndexPage({ searchParams }: PageProps) {
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page ?? '1') || 1);
 
-  const params = new URLSearchParams({ page: String(page), pageSize: '12' });
-  if (sp.q) params.set('search', sp.q);
-
   let data: BlogList;
   try {
-    data = await api.get<BlogList>(`/api/blog?${params.toString()}`, {
-      next: { revalidate: 60 },
-    });
+    data = (await listBlog({ page, pageSize: 12, search: sp.q })) as unknown as BlogList;
   } catch {
     data = { total: 0, page, pageSize: 12, items: [] };
   }
