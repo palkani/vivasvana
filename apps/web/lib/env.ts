@@ -14,6 +14,10 @@ export const env = {
   supabaseAnonKey: envOr(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, ''),
   siteUrl: envOr(process.env.NEXT_PUBLIC_SITE_URL, 'http://localhost:3000'),
   razorpayKeyId: envOr(process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID, ''),
+  // Feature flag: only show "Continue with Google" once the Supabase Google
+  // provider + OAuth redirect URLs are configured. Flip to 'true' in Vercel
+  // after wiring, so live customers never meet a broken button.
+  googleAuthEnabled: envOr(process.env.NEXT_PUBLIC_GOOGLE_AUTH_ENABLED, '') === 'true',
 };
 
 // One-shot startup log so every cold start clearly reports what reached
