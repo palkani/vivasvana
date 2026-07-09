@@ -21,6 +21,13 @@ interface CookieToSet {
  */
 const ADMIN_LOGIN_PATH = '/admin/login';
 const ACCOUNT_LOGIN_PATH = '/account/login';
+// Public account pages that must be reachable while logged OUT (sign-in,
+// password recovery). Everything else under /account/* requires a session.
+const PUBLIC_ACCOUNT_PATHS = [
+  ACCOUNT_LOGIN_PATH,
+  '/account/forgot-password',
+  '/account/reset-password',
+];
 
 // Dev-only bypass for /admin/*. Honored only when not in production.
 const ADMIN_AUTH_DISABLED =
@@ -88,8 +95,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // /account/* requires auth (excluding the login page itself)
-  if (path.startsWith('/account') && path !== ACCOUNT_LOGIN_PATH && !user) {
+  // /account/* requires auth (excluding the public sign-in / recovery pages)
+  if (path.startsWith('/account') && !PUBLIC_ACCOUNT_PATHS.includes(path) && !user) {
     const url = request.nextUrl.clone();
     url.pathname = ACCOUNT_LOGIN_PATH;
     url.searchParams.set('redirectTo', path);
