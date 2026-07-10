@@ -102,7 +102,17 @@ NEXT_PUBLIC_GOOGLE_AUTH_ENABLED=true
 
 # Part 2 — SMS (Twilio + India DLT)
 
-Time: **1–2 weeks**, mostly DLT paperwork. Cost: ~₹5,000 one-time DLT + ~₹0.12–0.25/SMS.
+Time: **1–2 weeks**, mostly DLT paperwork. Cost: ~₹5,000 one-time DLT, plus per-SMS:
+
+| Provider | India transactional / SMS |
+|---|---|
+| **Twilio** | **~₹3–7** (~$0.04–0.08/segment) |
+| MSG91 / Gupshup / Kaleyra | ~₹0.15–0.25 |
+
+Twilio is ~20× the cost of a local DLT-native aggregator for Indian traffic.
+**DLT registration (Step 2.2) is provider-independent** — it's done with the
+telecom operators, not with Twilio — so start it now and pick the provider
+later. See "Choosing a provider" at the end.
 
 ## ⚠️ Do this FIRST: lock your production domain
 
@@ -224,6 +234,47 @@ If you set neither `TWILIO_MESSAGING_SERVICE_SID` nor `TWILIO_FROM_NUMBER`,
 | `30007` | Carrier filtered (DLT/DND issue) |
 
 ---
+
+# Choosing a provider (Twilio vs Indian aggregator)
+
+**DLT registration is provider-independent.** You register your Principal Entity,
+Header, and Templates with the telecom operators' DLT portal — not with Twilio.
+Whatever you register works with any provider. So **start DLT now; decide the
+provider later.** Nothing is wasted.
+
+## Cost model
+
+Assume 1,000 orders/month, 3 SMS each (OTP + confirmation + shipped) = 3,000 SMS:
+
+| Provider | ₹/SMS | Monthly | Yearly |
+|---|---|---|---|
+| Twilio | ~₹4 | ~₹12,000 | ~₹1,44,000 |
+| MSG91 / Gupshup | ~₹0.20 | ~₹600 | ~₹7,200 |
+
+## Trade-off
+
+| | Twilio | Indian aggregator |
+|---|---|---|
+| Code work | **Zero** — already integrated | ~half day (swap one function) |
+| India cost | ~20× higher | Cheapest |
+| DLT support | Works, extra compliance step in Twilio console | DLT-native, simpler |
+| Global reach | Excellent | India-focused |
+| Deliverability (India) | Good | Usually better (direct operator routes) |
+
+## Recommendation
+
+- **Low volume / launching now / want zero engineering:** stay on **Twilio**.
+  Set the two env vars and go. Revisit when SMS spend becomes visible.
+- **Expecting real order volume:** move to **MSG91 or Gupshup**. The entire
+  provider surface is one function:
+
+  ```ts
+  export async function sendSms(msg: SmsMessage): Promise<{ sid: string | null }>
+  ```
+
+  Everything else (OTP, order confirmation, shipped/delivered/cancelled) calls
+  only that. Swapping providers is a contained, low-risk change behind this
+  interface — no callers change.
 
 # Sequencing recommendation
 
