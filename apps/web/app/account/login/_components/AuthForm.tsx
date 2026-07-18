@@ -20,7 +20,15 @@ interface Props {
 type Step =
   | { kind: 'signin' }
   | { kind: 'signup' }
-  | { kind: 'signup-otp'; email: string; expiresAt: string };
+  | { kind: 'signup-otp'; email: string; expiresAt: string }
+  | { kind: 'phone' }
+  | { kind: 'phone-otp'; phone: string; expiresAt: string };
+
+interface PhoneVerifyResponse {
+  accessToken: string;
+  refreshToken: string;
+  user: { id: string; email: string; phone: string; name: string | null };
+}
 
 interface SignupVerifyResponse {
   accessToken: string;
@@ -172,7 +180,173 @@ export function AuthForm({ redirectTo }: Props) {
     });
   }
 
+  // ---------------- Phone-OTP login ----------------
+
+  function requestPhoneOtp(resend = false) {
+    setError(null);
+    setInfo(null);
+    startTransition(async () => {
+      try {
+        const res = await api.post<{ phone: string; expiresAt: string }>(
+          '/api/auth/phone/request-otp',
+          { phone: phone.trim() },
+        );
+        setStep({ kind: 'phone-otp', phone: res.phone, expiresAt: res.expiresAt });
+        setOtp('');
+        setInfo(
+          resend
+            ? `A fresh code is on its way to ${res.phone}.`
+            : `We sent a 6-digit code to ${res.phone}. It expires in 10 minutes.`,
+        );
+      } catch (err) {
+        setError(extractMessage(err) ?? 'Could not send the code.');
+      }
+    });
+  }
+
+  function handleRequestPhoneOtp(e: React.FormEvent) {
+    e.preventDefault();
+    requestPhoneOtp(false);
+  }
+
+  function handleVerifyPhone(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (step.kind !== 'phone-otp') return;
+    const verifyPhone = step.phone;
+    startTransition(async () => {
+      try {
+        const result = await api.post<PhoneVerifyResponse>('/api/auth/phone/verify', {
+          phone: verifyPhone,
+          code: otp,
+        });
+        const supabase = createSupabaseBrowserClient();
+        const { error: setErr } = await supabase.auth.setSession({
+          access_token: result.accessToken,
+          refresh_token: result.refreshToken,
+        });
+        if (setErr) {
+          setError(setErr.message);
+          return;
+        }
+        await mergeGuestCart(result.accessToken);
+        router.push(redirectTo);
+        router.refresh();
+      } catch (err) {
+        setError(extractMessage(err) ?? 'Could not verify the code.');
+      }
+    });
+  }
+
   // ---------------- Render ----------------
+
+  if (step.kind === 'phone' || step.kind === 'phone-otp') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-center">
+            {step.kind === 'phone' ? 'Sign in with mobile' : 'Enter the code'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {step.kind === 'phone' ? (
+            <form onSubmit={handleRequestPhoneOtp} className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                We&rsquo;ll text a 6-digit code to your mobile number.
+              </p>
+              <label className="block space-y-1">
+                <span className="text-sm font-medium">Mobile number</span>
+                <Input
+                  type="tel"
+                  inputMode="numeric"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  autoComplete="tel"
+                  placeholder="98765 43210"
+                  required
+                />
+              </label>
+              {error && (
+                <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+                  {error}
+                </p>
+              )}
+              <Button type="submit" className="w-full" disabled={pending}>
+                {pending ? 'Sending…' : 'Send code'}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyPhone} className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Enter the code sent to{' '}
+                <span className="font-medium text-foreground">{step.phone}</span>.
+              </p>
+              <label className="block space-y-1">
+                <span className="text-sm font-medium">Verification code</span>
+                <Input
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  className="text-center text-lg tracking-[0.5em] tabular-nums"
+                  required
+                />
+              </label>
+              {info && (
+                <p className="rounded-md border border-leaf-200 bg-leaf-50 p-2 text-xs text-leaf-800">
+                  {info}
+                </p>
+              )}
+              {error && (
+                <p className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+                  {error}
+                </p>
+              )}
+              <Button type="submit" className="w-full" disabled={pending || otp.length !== 6}>
+                {pending ? 'Verifying…' : 'Verify & sign in'}
+              </Button>
+              <div className="flex items-center justify-between pt-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => requestPhoneOtp(true)}
+                  disabled={pending}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Resend code
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep({ kind: 'phone' });
+                    setOtp('');
+                    setError(null);
+                    setInfo(null);
+                  }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Change number
+                </button>
+              </div>
+            </form>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setStep({ kind: 'signin' });
+              setError(null);
+              setInfo(null);
+            }}
+            className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground"
+          >
+            ← Back to email sign in
+          </button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (step.kind === 'signup-otp') {
     return (
@@ -354,6 +528,28 @@ export function AuthForm({ redirectTo }: Props) {
                 : 'Send verification code'}
           </Button>
         </form>
+        {step.kind === 'signin' && (
+          <>
+            <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              or
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setStep({ kind: 'phone' });
+                setError(null);
+                setInfo(null);
+              }}
+              disabled={pending}
+            >
+              Sign in with mobile number
+            </Button>
+          </>
+        )}
         <button
           type="button"
           onClick={() => {

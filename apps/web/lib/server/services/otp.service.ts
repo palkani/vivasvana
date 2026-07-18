@@ -123,6 +123,82 @@ export class OtpService {
     if (consumed.count === 0) return { ok: false, reason: 'WRONG_CODE' };
     return { ok: true };
   }
+
+  // ----- Phone variants (same semantics, keyed on the `phone` column) -----
+
+  /**
+   * Issue a fresh OTP for the (phone, purpose) pair. Returns the plaintext
+   * code so the caller can SMS it. `phone` must already be normalized to
+   * E.164 by the caller. The DB only ever sees the hash.
+   */
+  async issuePhone(args: { phone: string; purpose: OtpPurpose }): Promise<{
+    code: string;
+    expiresAt: Date;
+  }> {
+    const phone = args.phone.trim();
+
+    const last = await this.prisma.otpCode.findFirst({
+      where: { phone, purpose: args.purpose },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (last && Date.now() - last.createdAt.getTime() < RESEND_COOLDOWN_MS) {
+      throw new Error('OTP_COOLDOWN');
+    }
+
+    await this.prisma.otpCode.updateMany({
+      where: { phone, purpose: args.purpose, usedAt: null },
+      data: { usedAt: new Date(0) },
+    });
+
+    const code = generateNumericCode(CODE_LENGTH);
+    const expiresAt = new Date(Date.now() + CODE_TTL_MS);
+    await this.prisma.otpCode.create({
+      data: { phone, codeHash: hash(code), purpose: args.purpose, expiresAt },
+    });
+
+    return { code, expiresAt };
+  }
+
+  /** Verify a plaintext code against the latest outstanding (phone, purpose) OTP. */
+  async verifyPhone(args: {
+    phone: string;
+    code: string;
+    purpose: OtpPurpose;
+  }): Promise<OtpVerifyOutcome> {
+    const phone = args.phone.trim();
+    const code = args.code.trim();
+    if (!/^\d{6}$/.test(code)) return { ok: false, reason: 'WRONG_CODE' };
+
+    const row = await this.prisma.otpCode.findFirst({
+      where: { phone, purpose: args.purpose, usedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!row) return { ok: false, reason: 'NOT_FOUND' };
+    if (row.expiresAt < new Date()) return { ok: false, reason: 'EXPIRED' };
+
+    if (row.attempts >= MAX_ATTEMPTS) {
+      await this.prisma.otpCode.update({
+        where: { id: row.id },
+        data: { usedAt: new Date(0) },
+      });
+      return { ok: false, reason: 'TOO_MANY_ATTEMPTS' };
+    }
+
+    if (row.codeHash !== hash(code)) {
+      await this.prisma.otpCode.update({
+        where: { id: row.id },
+        data: { attempts: { increment: 1 } },
+      });
+      return { ok: false, reason: 'WRONG_CODE' };
+    }
+
+    const consumed = await this.prisma.otpCode.updateMany({
+      where: { id: row.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+    if (consumed.count === 0) return { ok: false, reason: 'WRONG_CODE' };
+    return { ok: true };
+  }
 }
 
 function hash(plain: string): string {

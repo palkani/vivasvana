@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { badRequest, conflict } from '@/lib/server/http';
+import { badRequest, conflict, forbidden } from '@/lib/server/http';
 
 /**
  * Maps AuthService / OtpService domain errors to HTTP responses. Ported
@@ -24,6 +24,12 @@ export function mapAuthError(err: unknown): NextResponse {
     }
     if (err.message === 'EMAIL_REQUIRED') {
       throw badRequest('Email is required');
+    }
+    if (err.message === 'PHONE_INVALID' || err.message === 'PHONE_EMPTY') {
+      throw badRequest('Enter a valid mobile number (e.g. 98765 43210).');
+    }
+    if (err.message === 'ACCOUNT_DISABLED') {
+      throw forbidden('This account has been disabled. Contact support.');
     }
     if (err.message === 'OTP_COOLDOWN') {
       return NextResponse.json(

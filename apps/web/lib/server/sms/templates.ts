@@ -32,10 +32,12 @@ export function renderOrderConfirmationSms(order: {
  */
 export function renderOtpSms(args: {
   code: string;
-  kind: 'signup' | 'order';
+  kind: 'signup' | 'order' | 'login';
   expiresInMinutes: number;
 }): string {
-  const tag = args.kind === 'signup' ? 'account' : 'order';
+  // `tag` is the {#var#} slot in the DLT-registered OTP template, so adding a
+  // new kind ('login') needs no new template — it's just another value.
+  const tag = args.kind === 'signup' ? 'account' : args.kind;
   // Example: "Vivasvana: 123456 is your account verification code.
   //  Valid 10 min. Do not share." (~85 chars)
   return (

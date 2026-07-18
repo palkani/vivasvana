@@ -1,10 +1,13 @@
+import { randomBytes } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
 import type { PrismaClient } from '@vivasvana/db';
 import { OtpService } from './otp.service';
 import { supabaseAdmin } from '../integrations/supabase-admin';
 import { sendEmail } from '../integrations/email';
-import { sendSms } from '../integrations/sms';
+import { sendSms, normalizePhone } from '../integrations/sms';
 import { renderOtp } from '../emails/templates';
 import { renderOtpSms } from '../sms/templates';
+import { env } from '../config/env';
 
 /**
  * Customer authentication orchestrator.
@@ -163,6 +166,103 @@ export class AuthService {
         email,
         name: args.name ?? null,
       },
+    };
+  }
+
+  // ----- Phone-OTP login (passwordless) ----------------------------------
+
+  /**
+   * Stage 1 of phone login: normalize the number, issue a LOGIN OTP, and
+   * SMS it. Throws PHONE_INVALID/PHONE_EMPTY on a bad number (loud, not a
+   * silent drop). SMS send is awaited so it actually goes out on serverless;
+   * in stub mode (no Twilio creds) it no-ops to a console log.
+   */
+  async requestPhoneOtp(args: { phone: string }): Promise<{ phone: string; expiresAt: Date }> {
+    const phone = normalizePhone(args.phone);
+    const issued = await this.otp.issuePhone({ phone, purpose: 'LOGIN' });
+    await sendSms({
+      to: phone,
+      body: renderOtpSms({ code: issued.code, kind: 'login', expiresInMinutes: OTP_TTL_MIN }),
+    }).catch((err) =>
+      console.warn('phone login otp sms failed (non-blocking)', {
+        phone,
+        error: (err as Error).message,
+      }),
+    );
+    return { phone, expiresAt: issued.expiresAt };
+  }
+
+  /**
+   * Stage 2 of phone login: verify the OTP, find-or-create the Supabase user
+   * keyed on phone, and mint a session.
+   *
+   * Session minting is NON-DESTRUCTIVE: we generate a one-time magiclink
+   * token via the Admin API and verify it, which yields real session tokens
+   * WITHOUT touching the user's password. (A naive "reset password then sign
+   * in" would break email/password login for anyone who has both.)
+   *
+   * Phone is treated as its own identity — a phone-only user gets a
+   * synthesized email so we never need Supabase's phone provider enabled.
+   * Account-linking (same person via email AND phone) is intentionally out
+   * of scope for v1.
+   */
+  async verifyPhoneOtp(args: { phone: string; code: string }): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: { id: string; email: string; phone: string; name: string | null };
+  }> {
+    const phone = normalizePhone(args.phone);
+    const result = await this.otp.verifyPhone({ phone, code: args.code, purpose: 'LOGIN' });
+    if (!result.ok) throw new Error(`OTP_${result.reason}`);
+
+    const admin = supabaseAdmin();
+
+    let user = await this.prisma.user.findFirst({ where: { phone } });
+    let email: string;
+    if (user) {
+      if (user.deletedAt) throw new Error('ACCOUNT_DISABLED');
+      email = user.email;
+    } else {
+      email = `phone_${phone.replace(/\D/g, '')}@phone.vivasvana.app`;
+      const created = await admin.auth.admin.createUser({
+        email,
+        phone,
+        email_confirm: true,
+        phone_confirm: true,
+        password: randomBytes(24).toString('hex'),
+        user_metadata: { phone },
+      });
+      if (created.error || !created.data.user) {
+        const msg = created.error?.message?.toLowerCase() ?? '';
+        if (msg.includes('fetch failed') || msg.includes('econnrefused')) {
+          throw new Error('SUPABASE_UNREACHABLE', { cause: created.error });
+        }
+        throw created.error ?? new Error('SUPABASE_CREATE_FAILED');
+      }
+      user = await this.prisma.user.create({
+        data: { id: created.data.user.id, email, phone, role: 'CUSTOMER' },
+      });
+    }
+
+    const link = await admin.auth.admin.generateLink({ type: 'magiclink', email });
+    if (link.error || !link.data.properties?.hashed_token) {
+      throw link.error ?? new Error('SESSION_MINT_FAILED');
+    }
+    const anon = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    const verified = await anon.auth.verifyOtp({
+      token_hash: link.data.properties.hashed_token,
+      type: 'email',
+    });
+    if (verified.error || !verified.data.session) {
+      throw verified.error ?? new Error('SESSION_MINT_FAILED');
+    }
+
+    return {
+      accessToken: verified.data.session.access_token,
+      refreshToken: verified.data.session.refresh_token,
+      user: { id: user.id, email: user.email, phone, name: user.name },
     };
   }
 
