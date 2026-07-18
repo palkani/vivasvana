@@ -20,7 +20,13 @@ export const POST = route(async (req) => {
   try {
     const result = await service.requestPhoneOtp(body);
     return json(
-      { phone: result.phone, expiresAt: result.expiresAt.toISOString() },
+      {
+        phone: result.phone,
+        expiresAt: result.expiresAt.toISOString(),
+        // Present ONLY when AUTH_DEBUG_OTP=true — lets you test without a live
+        // SMS provider. Remove that env var before real users arrive.
+        ...(result.devCode ? { devCode: result.devCode } : {}),
+      },
       { status: 201 },
     );
   } catch (err) {

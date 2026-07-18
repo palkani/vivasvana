@@ -6,6 +6,7 @@ import { sendEmail } from '../integrations/email';
 import { sendSms, normalizePhone } from '../integrations/sms';
 import { renderOtp } from '../emails/templates';
 import { renderOtpSms } from '../sms/templates';
+import { env } from '../config/env';
 
 /**
  * Customer authentication orchestrator.
@@ -175,19 +176,37 @@ export class AuthService {
    * silent drop). SMS send is awaited so it actually goes out on serverless;
    * in stub mode (no Twilio creds) it no-ops to a console log.
    */
-  async requestPhoneOtp(args: { phone: string }): Promise<{ phone: string; expiresAt: Date }> {
+  async requestPhoneOtp(
+    args: { phone: string },
+  ): Promise<{ phone: string; expiresAt: Date; devCode?: string }> {
     const phone = normalizePhone(args.phone);
+    console.log('[phone-auth] request-otp received', { phone });
     const issued = await this.otp.issuePhone({ phone, purpose: 'LOGIN' });
-    await sendSms({
+
+    const sms = await sendSms({
       to: phone,
       body: renderOtpSms({ code: issued.code, kind: 'login', expiresInMinutes: OTP_TTL_MIN }),
-    }).catch((err) =>
-      console.warn('phone login otp sms failed (non-blocking)', {
-        phone,
-        error: (err as Error).message,
-      }),
-    );
-    return { phone, expiresAt: issued.expiresAt };
+    }).catch((err) => {
+      console.error('[phone-auth] SMS send FAILED', { phone, error: (err as Error).message });
+      return { sid: null as string | null };
+    });
+
+    if (sms?.sid) {
+      console.log('[phone-auth] OTP sent via SMS', { phone, sid: sms.sid });
+    } else {
+      // Stub mode (no Twilio creds) or a send failure — no real SMS went out.
+      console.warn(
+        '[phone-auth] OTP was NOT delivered via SMS (Twilio not configured or send failed). ' +
+          'Set AUTH_DEBUG_OTP=true to expose the code for testing.',
+        { phone, debugCodeExposed: env.AUTH_DEBUG_OTP, code: env.AUTH_DEBUG_OTP ? issued.code : undefined },
+      );
+    }
+
+    return {
+      phone,
+      expiresAt: issued.expiresAt,
+      ...(env.AUTH_DEBUG_OTP ? { devCode: issued.code } : {}),
+    };
   }
 
   /**
@@ -210,8 +229,13 @@ export class AuthService {
     user: { id: string; email: string; phone: string; name: string | null };
   }> {
     const phone = normalizePhone(args.phone);
+    console.log('[phone-auth] verify received', { phone });
     const result = await this.otp.verifyPhone({ phone, code: args.code, purpose: 'LOGIN' });
-    if (!result.ok) throw new Error(`OTP_${result.reason}`);
+    if (!result.ok) {
+      console.warn('[phone-auth] OTP verify rejected', { phone, reason: result.reason });
+      throw new Error(`OTP_${result.reason}`);
+    }
+    console.log('[phone-auth] OTP verified OK', { phone });
 
     const admin = supabaseAdmin();
 
@@ -228,10 +252,15 @@ export class AuthService {
     if (user) {
       if (user.deletedAt) throw new Error('ACCOUNT_DISABLED');
       email = user.email;
+      console.log('[phone-auth] existing user, rotating one-time password', {
+        phone,
+        userId: user.id,
+      });
       const upd = await admin.auth.admin.updateUserById(user.id, {
         password: oneTimePassword,
       });
       if (upd.error) {
+        console.error('[phone-auth] updateUserById FAILED', { phone, error: upd.error.message });
         const msg = upd.error.message?.toLowerCase() ?? '';
         if (msg.includes('fetch failed') || msg.includes('econnrefused')) {
           throw new Error('SUPABASE_UNREACHABLE', { cause: upd.error });
@@ -240,6 +269,7 @@ export class AuthService {
       }
     } else {
       email = `phone_${phone.replace(/\D/g, '')}@phone.vivasvana.app`;
+      console.log('[phone-auth] new phone user, creating', { phone, email });
       const created = await admin.auth.admin.createUser({
         email,
         phone,
@@ -249,6 +279,10 @@ export class AuthService {
         user_metadata: { phone },
       });
       if (created.error || !created.data.user) {
+        console.error('[phone-auth] createUser FAILED', {
+          phone,
+          error: created.error?.message,
+        });
         const msg = created.error?.message?.toLowerCase() ?? '';
         if (msg.includes('fetch failed') || msg.includes('econnrefused')) {
           throw new Error('SUPABASE_UNREACHABLE', { cause: created.error });
@@ -258,12 +292,18 @@ export class AuthService {
       user = await this.prisma.user.create({
         data: { id: created.data.user.id, email, phone, role: 'CUSTOMER' },
       });
+      console.log('[phone-auth] user created', { phone, userId: user.id });
     }
 
     const session = await admin.auth.signInWithPassword({ email, password: oneTimePassword });
     if (session.error || !session.data.session) {
+      console.error('[phone-auth] signInWithPassword FAILED (session mint)', {
+        phone,
+        error: session.error?.message,
+      });
       throw session.error ?? new Error('SESSION_MINT_FAILED');
     }
+    console.log('[phone-auth] session minted OK', { phone, userId: user.id });
 
     return {
       accessToken: session.data.session.access_token,

@@ -77,9 +77,10 @@ export async function sendSms(msg: SmsMessage): Promise<{ sid: string | null }> 
 
   const c = client();
   if (!c) {
-    // Dev fallback so the flow can be tested end-to-end without a real
-    // Twilio account. Logs the destination + first 100 chars of the body.
-    console.info('[sms:dev] would send', { to, body: msg.body.slice(0, 100) });
+    // Stub mode (no Twilio creds). Log LOUDLY with the FULL body so the OTP
+    // is findable in the Vercel function logs while testing without a real
+    // SMS provider. console.warn lands in the "Warning" severity bucket.
+    console.warn('[SMS STUB] no Twilio creds — message NOT sent. Full body:', { to, body: msg.body });
     return { sid: null };
   }
 

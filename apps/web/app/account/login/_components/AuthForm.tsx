@@ -187,16 +187,20 @@ export function AuthForm({ redirectTo }: Props) {
     setInfo(null);
     startTransition(async () => {
       try {
-        const res = await api.post<{ phone: string; expiresAt: string }>(
+        const res = await api.post<{ phone: string; expiresAt: string; devCode?: string }>(
           '/api/auth/phone/request-otp',
           { phone: phone.trim() },
         );
         setStep({ kind: 'phone-otp', phone: res.phone, expiresAt: res.expiresAt });
-        setOtp('');
+        // AUTH_DEBUG_OTP test mode: the API hands back the code so we can
+        // prefill it and log in without a live SMS provider.
+        setOtp(res.devCode ?? '');
         setInfo(
-          resend
-            ? `A fresh code is on its way to ${res.phone}.`
-            : `We sent a 6-digit code to ${res.phone}. It expires in 10 minutes.`,
+          res.devCode
+            ? `Test mode — your code is ${res.devCode} (prefilled). Just tap Verify.`
+            : resend
+              ? `A fresh code is on its way to ${res.phone}.`
+              : `We sent a 6-digit code to ${res.phone}. It expires in 10 minutes.`,
         );
       } catch (err) {
         setError(extractMessage(err) ?? 'Could not send the code.');

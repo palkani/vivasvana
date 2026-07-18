@@ -58,6 +58,15 @@ const EnvSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === 'true' || v === '1'),
+
+  // TESTING ONLY — when true, OTP endpoints return the code in their JSON
+  // response and log it loudly, so phone/email login can be exercised without
+  // a live SMS/email provider. Turn OFF (unset) for real users; leaving it on
+  // hands anyone the OTP for any number.
+  AUTH_DEBUG_OTP: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true' || v === '1'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
