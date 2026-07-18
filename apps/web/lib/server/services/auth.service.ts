@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto';
-import { createClient } from '@supabase/supabase-js';
 import type { PrismaClient } from '@vivasvana/db';
 import { OtpService } from './otp.service';
 import { supabaseAdmin } from '../integrations/supabase-admin';
@@ -7,7 +6,6 @@ import { sendEmail } from '../integrations/email';
 import { sendSms, normalizePhone } from '../integrations/sms';
 import { renderOtp } from '../emails/templates';
 import { renderOtpSms } from '../sms/templates';
-import { env } from '../config/env';
 
 /**
  * Customer authentication orchestrator.
@@ -217,11 +215,29 @@ export class AuthService {
 
     const admin = supabaseAdmin();
 
+    // One-time password we set then immediately consume to mint a session.
+    // Setting it is SAFE because users matched by phone are phone-only:
+    // `User.phone` is written ONLY by this flow, so there is no user-managed
+    // password to clobber. We mint the session by signing in with email +
+    // this password — the exact primitive the signup flow uses — so Supabase's
+    // phone provider need not be enabled.
+    const oneTimePassword = randomBytes(24).toString('hex');
+
     let user = await this.prisma.user.findFirst({ where: { phone } });
     let email: string;
     if (user) {
       if (user.deletedAt) throw new Error('ACCOUNT_DISABLED');
       email = user.email;
+      const upd = await admin.auth.admin.updateUserById(user.id, {
+        password: oneTimePassword,
+      });
+      if (upd.error) {
+        const msg = upd.error.message?.toLowerCase() ?? '';
+        if (msg.includes('fetch failed') || msg.includes('econnrefused')) {
+          throw new Error('SUPABASE_UNREACHABLE', { cause: upd.error });
+        }
+        throw new Error('SESSION_MINT_FAILED', { cause: upd.error });
+      }
     } else {
       email = `phone_${phone.replace(/\D/g, '')}@phone.vivasvana.app`;
       const created = await admin.auth.admin.createUser({
@@ -229,7 +245,7 @@ export class AuthService {
         phone,
         email_confirm: true,
         phone_confirm: true,
-        password: randomBytes(24).toString('hex'),
+        password: oneTimePassword,
         user_metadata: { phone },
       });
       if (created.error || !created.data.user) {
@@ -244,24 +260,14 @@ export class AuthService {
       });
     }
 
-    const link = await admin.auth.admin.generateLink({ type: 'magiclink', email });
-    if (link.error || !link.data.properties?.hashed_token) {
-      throw link.error ?? new Error('SESSION_MINT_FAILED');
-    }
-    const anon = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    });
-    const verified = await anon.auth.verifyOtp({
-      token_hash: link.data.properties.hashed_token,
-      type: 'email',
-    });
-    if (verified.error || !verified.data.session) {
-      throw verified.error ?? new Error('SESSION_MINT_FAILED');
+    const session = await admin.auth.signInWithPassword({ email, password: oneTimePassword });
+    if (session.error || !session.data.session) {
+      throw session.error ?? new Error('SESSION_MINT_FAILED');
     }
 
     return {
-      accessToken: verified.data.session.access_token,
-      refreshToken: verified.data.session.refresh_token,
+      accessToken: session.data.session.access_token,
+      refreshToken: session.data.session.refresh_token,
       user: { id: user.id, email: user.email, phone, name: user.name },
     };
   }
