@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { ShoppingBasket, Search, UserRound } from 'lucide-react';
+import { ShoppingBag, Search, UserRound } from 'lucide-react';
 import { useCartStore, cartItemCount } from '@/lib/cart-store';
 import { cn } from '@/lib/utils';
 
@@ -51,7 +51,7 @@ export function HeaderActions() {
         label={count > 0 ? `Cart (${count} item${count === 1 ? '' : 's'})` : 'Cart'}
         icon={
           <span className="relative inline-flex">
-            <ShoppingBasket className="h-5 w-5" strokeWidth={2} />
+            <ShoppingBag className="h-5 w-5" strokeWidth={2} />
             {count > 0 && (
               <span
                 aria-hidden
