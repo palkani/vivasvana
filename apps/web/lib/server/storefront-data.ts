@@ -2,6 +2,9 @@ import 'server-only';
 import { prisma } from '@vivasvana/db';
 import { ProductService } from './services/product.service';
 import { BlogService } from './services/blog.service';
+import { CartService } from './services/cart.service';
+import { AddressService } from './services/address.service';
+import { OrderService } from './services/order.service';
 import { serializeMoney } from './lib/decimal';
 import type { ProductDetail, ProductListResponse } from '@/lib/types';
 
@@ -72,4 +75,36 @@ export async function listBlog(
 export async function getBlogPost(slug: string) {
   const post = await new BlogService(prisma).publicGet(slug);
   return post ? serializeMoney(post) : null;
+}
+// --- Checkout / payment reads (RSC → DB directly; no fragile self-fetch) ---
+
+/**
+ * The cart for a resolved owner (logged-in userId OR guest sessionId cookie).
+ * Returns null when there is no owner. Reading straight from the DB here
+ * removes the server-side `/api/cart` self-fetch that could silently return
+ * empty on Vercel — the bug behind "Nothing to check out".
+ */
+export async function getCartForOwner(owner: { userId?: string; sessionId?: string }) {
+  if (!owner.userId && !owner.sessionId) return null;
+  const cart = await new CartService(prisma).getOrCreate(owner);
+  return serializeMoney(cart);
+}
+
+export async function getUserAddresses(userId: string) {
+  return serializeMoney(await new AddressService(prisma).listForUser(userId));
+}
+
+/** Public order lookup by UUID (the /pay/[orderId] capability URL). */
+export async function getOrderByIdPublic(id: string) {
+  const order = await prisma.order.findUnique({
+    where: { id },
+    include: { items: true, shippingAddress: true },
+  });
+  return order ? serializeMoney(order) : null;
+}
+
+/** Public order lookup by orderNumber + email (guest confirmation page). */
+export async function getOrderPublic(orderNumber: string, email: string) {
+  const order = await new OrderService(prisma).getPublic(orderNumber, email);
+  return order ? serializeMoney(order) : null;
 }

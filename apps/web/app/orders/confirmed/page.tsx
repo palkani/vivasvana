@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { api, type ApiError } from '@/lib/api';
+import { getOrderPublic } from '@/lib/server/storefront-data';
 import { formatINR } from '@/lib/utils';
 import { stateName } from '@/lib/india-states';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,16 +34,10 @@ export default async function OrderConfirmedPage({ searchParams }: PageProps) {
   const { orderNumber, email } = await searchParams;
   if (!orderNumber || !email) return notFound();
 
-  let order: Order | null = null;
-  try {
-    order = await api.get<Order>(
-      `/api/orders/lookup?orderNumber=${encodeURIComponent(orderNumber)}&email=${encodeURIComponent(email)}`,
-      { cache: 'no-store' },
-    );
-  } catch (err) {
-    if ((err as ApiError).status === 404) return notFound();
-    throw err;
-  }
+  // Read straight from the DB — a server-side self-fetch of /api/orders/lookup
+  // can fail on Vercel and would show a spurious "not found" right after a
+  // successful order.
+  const order = (await getOrderPublic(orderNumber, email)) as unknown as Order | null;
   if (!order) return notFound();
 
   return (

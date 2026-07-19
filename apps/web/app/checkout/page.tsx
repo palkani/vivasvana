@@ -3,8 +3,8 @@ import { cookies } from 'next/headers';
 import Link from 'next/link';
 import { CheckoutForm } from './_components/CheckoutForm';
 import { Button } from '@/components/ui/button';
-import { api } from '@/lib/api';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { getCartForOwner, getUserAddresses } from '@/lib/server/storefront-data';
 import type { Cart, Address } from '@/lib/types';
 
 export const metadata: Metadata = {
@@ -12,45 +12,27 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// Reads cart cookies + Supabase session — always per-request.
+// Reads the cart cookie + Supabase session — always per-request.
 export const dynamic = 'force-dynamic';
 
-async function fetchCart(): Promise<Cart | null> {
-  const cookieStore = await cookies();
-  const cookieHeader = cookieStore
-    .getAll()
-    .map((c) => `${c.name}=${c.value}`)
-    .join('; ');
-  try {
-    return await api.get<Cart>('/api/cart', { cache: 'no-store', forwardCookies: cookieHeader });
-  } catch {
-    return null;
-  }
-}
-
-async function fetchAddressesIfLoggedIn(): Promise<Address[]> {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) return [];
-  try {
-    return await api.get<Address[]>('/api/addresses', {
-      cache: 'no-store',
-      accessToken: session.access_token,
-    });
-  } catch {
-    return [];
-  }
-}
+const SESSION_COOKIE = 'vv_cart_sid';
 
 export default async function CheckoutPage() {
-  const cart = await fetchCart();
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // Nothing to check out → render an empty state instead of redirecting.
-  // redirect() from a server-component page throws NEXT_REDIRECT, which
-  // surfaces as a Console Error in the Next 15 dev overlay. Inline render
-  // is quiet AND gives clearer feedback ("here's why nothing happened").
+  // Resolve the cart owner exactly like the cart API does: a logged-in user's
+  // cart is keyed by userId, a guest's by the vv_cart_sid cookie. We read the
+  // cart straight from the DB (no server-side /api/cart self-fetch, which
+  // could silently return empty on Vercel → the "Nothing to check out" bug).
+  const jar = await cookies();
+  const sessionId = jar.get(SESSION_COOKIE)?.value;
+  const cart = (await getCartForOwner(
+    user ? { userId: user.id } : { sessionId },
+  )) as unknown as Cart | null;
+
   if (!cart || cart.items.length === 0) {
     return (
       <div className="container py-20">
@@ -74,11 +56,9 @@ export default async function CheckoutPage() {
     );
   }
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const addresses = user ? await fetchAddressesIfLoggedIn() : [];
+  const addresses = user
+    ? ((await getUserAddresses(user.id)) as unknown as Address[])
+    : [];
 
   return (
     <div className="container py-10">

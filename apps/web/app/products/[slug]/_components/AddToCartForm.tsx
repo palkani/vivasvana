@@ -40,8 +40,10 @@ export function AddToCartForm({ productId, maxQuantity }: Props) {
   }
 
   function handleBuyNow() {
+    // "Buy now" skips the cart and goes straight to checkout (that's the point
+    // of the button). The item is added first so checkout has something to show.
     startBuyingNow(() => {
-      handleAdd(() => router.push('/cart'));
+      handleAdd(() => router.push('/checkout'));
     });
   }
 
