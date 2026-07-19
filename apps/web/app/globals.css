@@ -107,9 +107,12 @@
   .animate-marquee:hover {
     animation-play-state: paused;
   }
+  /* Reduce-motion users still get a gentle, much slower scroll rather than a
+     dead stop — this decorative trust strip reads worse as a static wall of
+     text. Slow enough to be non-distracting. */
   @media (prefers-reduced-motion: reduce) {
     .animate-marquee {
-      animation: none;
+      animation-duration: 90s;
     }
   }
 }
