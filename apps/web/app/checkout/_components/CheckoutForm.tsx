@@ -59,14 +59,10 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
   const [discount, setDiscount] = useState<DiscountInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  // Two-stage place-order: first click requests an OTP, second click
-  // (with the code filled in) actually creates the order.
-  const [otpStage, setOtpStage] = useState<
-    | { kind: 'idle' }
-    | { kind: 'awaiting'; emailSent: string }
-  >({ kind: 'idle' });
-  const [orderOtp, setOrderOtp] = useState('');
-  const [otpInfo, setOtpInfo] = useState<string | null>(null);
+  // "Place order" opens a review modal; confirming it creates the order and
+  // routes to payment. No OTP — order-time OTP is friction that hurts
+  // conversion, and identity is already established at login / at payment.
+  const [reviewOpen, setReviewOpen] = useState(false);
 
   // PIN → city/state auto-fill is wired directly inside <SmartPincodeInput>
   // via onResolved. We keep one bit of state to know if the shopper has
@@ -129,56 +125,25 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
   }
 
   /**
-   * Stage 1 — the "Place order" button. Validates the form natively (via
-   * `<form required>` fields), then requests an OTP. We don't create the
-   * order yet — the next click does that, once the OTP is entered.
+   * "Place order" — the form's native `required` validation runs first (so we
+   * only get here with a filled shipping form), then we open the review modal.
    */
-  function handleRequestOrderOtp(e: React.FormEvent) {
+  function handleReview(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setOtpInfo(null);
     if (!contactEmail.trim()) {
-      setError('Please enter your email so we can send the confirmation code.');
+      setError('Please enter your email so we can send the order confirmation.');
       return;
     }
-    startTransition(async () => {
-      try {
-        const supabase = createSupabaseBrowserClient();
-        const { data: sessionData } = await supabase.auth.getSession();
-        const accessToken = sessionData.session?.access_token;
-        // Send the shipping phone too — the API uses it (when present) to
-        // dispatch the OTP via SMS in addition to email. Falls back to the
-        // contact phone if the shipping form hasn't been filled yet.
-        const otpPhone = contactPhone || shipping.phone || undefined;
-        const res = await api.post<{ email: string; expiresAt: string }>(
-          '/api/auth/order/request-otp',
-          { email: contactEmail, phone: otpPhone },
-          { accessToken },
-        );
-        setOtpStage({ kind: 'awaiting', emailSent: res.email });
-        setOtpInfo(
-          otpPhone
-            ? `We sent a 6-digit code to ${res.email} and your phone. Enter it below to place the order.`
-            : `We sent a 6-digit code to ${res.email}. Enter it below to place the order.`,
-        );
-      } catch (e) {
-        const err = e as { payload?: { message?: string }; message?: string };
-        setError(err.payload?.message ?? err.message ?? 'Could not send verification code');
-      }
-    });
+    setReviewOpen(true);
   }
 
   /**
-   * Stage 2 — confirm & place. Takes the OTP and runs the actual order
-   * create. The OTP is consumed server-side inside the order-create
-   * transaction so a leaked code can't be replayed.
+   * Confirm & place from the review modal — creates the order, clears the
+   * cart, and routes to payment (or straight to the confirmation page for COD).
    */
-  function handleConfirmAndPlace() {
+  function placeOrder() {
     setError(null);
-    if (!/^\d{6}$/.test(orderOtp)) {
-      setError('Please enter the 6-digit code from your email.');
-      return;
-    }
     startTransition(async () => {
       try {
         const supabase = createSupabaseBrowserClient();
@@ -202,7 +167,6 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
               country: 'IN',
             },
             discountCode: discount?.code,
-            verificationCode: orderOtp,
           },
           { accessToken },
         );
@@ -224,6 +188,7 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
 
         router.push(`/pay/${order.id}`);
       } catch (e) {
+        setReviewOpen(false);
         const err = e as { payload?: { message?: string }; message?: string };
         setError(err.payload?.message ?? err.message ?? 'Could not place order');
       }
@@ -232,7 +197,7 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
 
   return (
     <form
-      onSubmit={handleRequestOrderOtp}
+      onSubmit={handleReview}
       className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]"
     >
       <div className="min-w-0 space-y-6">
@@ -526,77 +491,106 @@ export function CheckoutForm({ initialCart, savedAddresses, userEmail }: Props) 
             <span className="tabular-nums">{formatINR(total)}</span>
           </div>
 
-          {otpStage.kind === 'idle' ? (
-            <>
-              <Button type="submit" className="w-full" size="lg" disabled={pending}>
-                {pending ? 'Sending code…' : `Place order · ${formatINR(total)}`}
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                We&rsquo;ll email a 6-digit code to confirm this order. By placing
-                it you agree to our terms of service.
-              </p>
-            </>
-          ) : (
-            <div className="space-y-3 rounded-md border border-brand-200 bg-brand-50/40 p-3">
-              <p className="text-xs text-muted-foreground">
-                Code sent to{' '}
-                <span className="font-medium text-foreground">{otpStage.emailSent}</span>.
-                Check your inbox (and spam folder) for a 6-digit code from Vivasvana.
-              </p>
-              <Input
-                value={orderOtp}
-                onChange={(e) =>
-                  setOrderOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
-                }
-                inputMode="numeric"
-                pattern="\d{6}"
-                maxLength={6}
-                autoComplete="one-time-code"
-                placeholder="6-digit code"
-                className="text-center text-lg tracking-[0.4em] tabular-nums"
-              />
-              {otpInfo && (
-                <p className="text-xs text-leaf-700">{otpInfo}</p>
-              )}
-              <Button
-                type="button"
-                onClick={handleConfirmAndPlace}
-                className="w-full"
-                size="lg"
-                disabled={pending || orderOtp.length !== 6}
-              >
-                {pending ? 'Confirming…' : `Confirm & place order · ${formatINR(total)}`}
-              </Button>
-              <div className="flex items-center justify-between text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOrderOtp('');
-                    setOtpInfo(null);
-                    // Re-trigger the form's submit handler to request a new code.
-                    handleRequestOrderOtp(new Event('submit') as unknown as React.FormEvent);
-                  }}
-                  disabled={pending}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  Resend code
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOtpStage({ kind: 'idle' });
-                    setOrderOtp('');
-                    setOtpInfo(null);
-                  }}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  Edit details
-                </button>
-              </div>
-            </div>
-          )}
+          <Button type="submit" className="w-full" size="lg" disabled={pending}>
+            {`Place order · ${formatINR(total)}`}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            You&rsquo;ll review your order before{' '}
+            {paymentMethod === 'COD' ? 'confirming' : 'paying'}. By placing it you agree to
+            our terms of service.
+          </p>
         </CardContent>
       </Card>
+
+      {reviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border bg-card p-6 shadow-xl">
+            <h2 className="font-serif text-xl font-semibold">Review your order</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Please confirm everything looks right before {paymentMethod === 'COD' ? 'placing it' : 'you pay'}.
+            </p>
+
+            <div className="mt-4 divide-y rounded-md border">
+              {items.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-3 p-3 text-sm">
+                  <span className="min-w-0 truncate">
+                    <span className="font-medium">{item.product.title}</span>
+                    <span className="text-muted-foreground"> × {item.quantity}</span>
+                  </span>
+                  <span className="shrink-0 tabular-nums">
+                    {formatINR(parseFloat(item.price) * item.quantity)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-md border p-3 text-sm">
+              <p className="font-medium">Ship to</p>
+              <p className="mt-1 text-muted-foreground">
+                {shipping.name} · {shipping.phone}
+                <br />
+                {shipping.addressLine}
+                {shipping.landmark ? `, ${shipping.landmark}` : ''}
+                <br />
+                {shipping.city}, {stateName(shipping.state)} – {shipping.pincode}
+              </p>
+              <p className="mt-2 text-muted-foreground">{contactEmail}</p>
+            </div>
+
+            <div className="mt-4 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Subtotal</span>
+                <span className="tabular-nums">{formatINR(subtotal)}</span>
+              </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-leaf-700">
+                  <span>Discount{discount?.code ? ` (${discount.code})` : ''}</span>
+                  <span className="tabular-nums">−{formatINR(discountAmount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Shipping</span>
+                <span className="tabular-nums">
+                  {shippingCost === 0 ? 'Free' : formatINR(shippingCost)}
+                </span>
+              </div>
+              {codFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">COD fee</span>
+                  <span className="tabular-nums">{formatINR(codFee)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t pt-2 text-base font-semibold">
+                <span>Total · {paymentMethod === 'COD' ? 'Cash on delivery' : 'Pay online'}</span>
+                <span className="tabular-nums">{formatINR(total)}</span>
+              </div>
+            </div>
+
+            {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+
+            <div className="mt-6 flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setReviewOpen(false)}
+                disabled={pending}
+              >
+                Edit
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                size="lg"
+                onClick={placeOrder}
+                disabled={pending}
+              >
+                {pending ? 'Placing…' : paymentMethod === 'COD' ? 'Confirm order' : 'Confirm & pay'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
