@@ -1,4 +1,4 @@
-import { jwtVerify } from 'jose';
+import { jwtVerify, createRemoteJWKSet } from 'jose';
 import { prisma } from '@vivasvana/db';
 import type { StaffRole, UserRole } from '@vivasvana/db';
 import { env } from './config/env';
@@ -39,26 +39,50 @@ const notifications = new NotificationService(prisma);
 
 const jwtSecret = () => new TextEncoder().encode(env.SUPABASE_JWT_SECRET);
 
+// Remote JWKS for asymmetric (ES256/RS256) Supabase tokens — the "new JWT
+// signing keys" mode (indicated by a "Legacy JWT secret" in the dashboard).
+// jose fetches once and caches the keys, so verification stays local + fast.
+let _jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+function jwks() {
+  if (!_jwks) {
+    _jwks = createRemoteJWKSet(new URL(`${env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`));
+  }
+  return _jwks;
+}
+
+function claimsFrom(payload: { sub?: unknown; email?: unknown }): {
+  sub: string;
+  email: string;
+} | null {
+  if (!payload.sub || typeof payload.sub !== 'string') return null;
+  return { sub: payload.sub, email: typeof payload.email === 'string' ? payload.email : '' };
+}
+
 async function verifyToken(token: string): Promise<{ sub: string; email: string } | null> {
-  // Fast path: verify locally with the shared HS256 JWT secret (no network).
+  // 1) Legacy HS256 shared secret (older projects / older tokens).
   try {
     const { payload } = await jwtVerify(token, jwtSecret(), {
       algorithms: ['HS256'],
       audience: 'authenticated',
     });
-    if (payload.sub && typeof payload.sub === 'string') {
-      const email = typeof payload.email === 'string' ? payload.email : '';
-      return { sub: payload.sub, email };
-    }
+    const c = claimsFrom(payload);
+    if (c) return c;
   } catch {
-    // Local verify failed — fall through to the Supabase-validated path.
+    /* not an HS256 token, or wrong secret — try asymmetric next */
   }
 
-  // Fallback: let Supabase validate the token. This makes auth robust to a
-  // mismatched/missing SUPABASE_JWT_SECRET AND to projects using the newer
-  // ASYMMETRIC JWT signing keys (ES256/RS256), which the HS256 shared secret
-  // can't verify. Slower (a network round-trip) but correct — otherwise every
-  // authenticated request 401s.
+  // 2) Asymmetric (ES256/RS256) via the project's JWKS — the current Supabase
+  // default. Verified locally with cached public keys, no network per request.
+  try {
+    const { payload } = await jwtVerify(token, jwks(), { audience: 'authenticated' });
+    const c = claimsFrom(payload);
+    if (c) return c;
+  } catch {
+    /* fall through to the server-validated path */
+  }
+
+  // 3) Last resort: let Supabase validate the token directly. Robust to any
+  // config/signing surprise; slower (a network round-trip) but correct.
   try {
     const { data, error } = await supabaseAdmin().auth.getUser(token);
     if (error || !data.user) return null;
