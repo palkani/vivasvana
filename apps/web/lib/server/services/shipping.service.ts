@@ -6,6 +6,7 @@ import {
   assignAwb,
   type ServiceabilityResponse,
 } from '../integrations/shiprocket';
+import { lookupPincode } from '../integrations/india-post';
 import type { NotificationService, OrderStatusUpdate } from './notification.service';
 
 /**
@@ -76,7 +77,7 @@ export class ShippingService {
 
   async checkPincode(pincode: string, weightKg = 0.5): Promise<PincodeCheckResult> {
     const normalized = pincode.replace(/\D/g, '').slice(0, 6);
-    if (normalized.length !== 6) {
+    if (!/^[1-9]\d{5}$/.test(normalized)) {
       return {
         pincode,
         serviceable: false,
@@ -86,46 +87,63 @@ export class ShippingService {
         message: 'Enter a valid 6-digit pincode.',
       };
     }
-    let res: ServiceabilityResponse;
+
+    // Validate against India Post first — free, needs no Shiprocket config, and
+    // confirms it's a real, deliverable Indian pincode (and gives us the place
+    // name). A pincode India Post can't resolve is genuinely not a valid one.
+    const place = await lookupPincode(normalized).catch(() => null);
+    if (!place) {
+      return {
+        pincode: normalized,
+        serviceable: false,
+        codAvailable: false,
+        etaDays: null,
+        rate: null,
+        message: 'That doesn’t look like a valid Indian pincode. Please double-check it.',
+      };
+    }
+    const where = `${place.city}, ${place.state}`;
+
+    // Enrich with real Shiprocket rates/ETA when we can. But NEVER block a sale
+    // to a valid Indian pincode just because the rate lookup is unconfigured or
+    // flaky — fall back to a standard delivery promise instead.
     try {
-      res = await checkServiceability({
+      const res: ServiceabilityResponse = await checkServiceability({
         pickupPincode: PICKUP_PINCODE,
         deliveryPincode: normalized,
         weightKg,
         cod: true,
       });
+      if (res.available && res.cheapest) {
+        const eta = parseInt(res.cheapest.estimated_delivery_days, 10) || null;
+        const codSuffix = res.cod_available ? ' · COD available' : '';
+        return {
+          pincode: normalized,
+          serviceable: true,
+          codAvailable: res.cod_available,
+          etaDays: eta,
+          rate: res.cheapest.freight_charge,
+          message: eta
+            ? `Delivers to ${where} in ${eta}–5 working days${codSuffix}.`
+            : `Delivery available to ${where}${codSuffix}.`,
+        };
+      }
+      console.warn(
+        '[shipping] Shiprocket returned no couriers — using standard delivery fallback',
+        { pincode: normalized, pickup: PICKUP_PINCODE },
+      );
     } catch (err) {
-      console.error('shiprocket serviceability failed', err);
-      return {
-        pincode: normalized,
-        serviceable: false,
-        codAvailable: false,
-        etaDays: null,
-        rate: null,
-        message: "We're checking availability for this pincode — please try again in a moment.",
-      };
+      console.error('[shipping] serviceability lookup failed — using standard delivery fallback', err);
     }
-    if (!res.available || !res.cheapest) {
-      return {
-        pincode: normalized,
-        serviceable: false,
-        codAvailable: false,
-        etaDays: null,
-        rate: null,
-        message: 'Sorry, we don’t deliver to this pincode yet. Email hello@vivasvana.com.',
-      };
-    }
-    const eta = parseInt(res.cheapest.estimated_delivery_days, 10) || null;
-    const codSuffix = res.cod_available ? ' · COD available' : '';
+
+    // Fallback: valid Indian pincode → we ship there.
     return {
       pincode: normalized,
       serviceable: true,
-      codAvailable: res.cod_available,
-      etaDays: eta,
-      rate: res.cheapest.freight_charge,
-      message: eta
-        ? `Delivers in ${eta}–5 working days${codSuffix}.`
-        : `Delivery available${codSuffix}.`,
+      codAvailable: true,
+      etaDays: 5,
+      rate: null,
+      message: `Delivers to ${where} in 3–5 working days · COD available.`,
     };
   }
 
