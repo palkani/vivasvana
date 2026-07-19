@@ -18,32 +18,36 @@ export function Header() {
             sizes it pixelated and got visually drowned out by the bold
             green trust strip below. This HTML/SVG version stays sharp at
             any size and gives the wordmark proper weight. */}
-        <Link
-          href="/"
-          aria-label="Vivasvana — Mindful nourishment made pure"
-          className="flex items-center leading-none"
-        >
-          <Image
-            src="/brand/logo-2026.png"
-            alt="Vivasvana — Mindful nourishment made pure"
-            width={1363}
-            height={855}
-            priority
-            className="h-14 w-auto md:h-16"
-          />
-        </Link>
+        {/* Logo + nav grouped on the left so the menu sits right next to the
+            logo (justify-between then pushes the action icons to the right). */}
+        <div className="flex items-center gap-6 md:gap-10">
+          <Link
+            href="/"
+            aria-label="Vivasvana — Mindful nourishment made pure"
+            className="flex items-center leading-none"
+          >
+            <Image
+              src="/brand/logo-2026.png"
+              alt="Vivasvana — Mindful nourishment made pure"
+              width={1363}
+              height={855}
+              priority
+              className="h-14 w-auto md:h-16"
+            />
+          </Link>
 
-        <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">
-          {nav.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="text-sm font-medium text-foreground/80 transition-colors hover:text-brand-700"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+          <nav className="hidden items-center gap-6 md:flex lg:gap-8" aria-label="Primary">
+            {nav.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="text-sm font-medium text-foreground/80 transition-colors hover:text-brand-700"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
 
         <HeaderActions />
       </div>
