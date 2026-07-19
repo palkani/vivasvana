@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: Promise<{ redirectTo?: string }>;
+  searchParams: Promise<{ redirectTo?: string; timeout?: string }>;
 }
 
 const ADMIN_AUTH_DISABLED =
@@ -22,7 +22,7 @@ const ADMIN_AUTH_DISABLED =
   process.env.NEXT_PUBLIC_ADMIN_AUTH_DISABLED === 'true';
 
 export default async function AdminLoginPage({ searchParams }: PageProps) {
-  const { redirectTo = '/admin' } = await searchParams;
+  const { redirectTo = '/admin', timeout } = await searchParams;
 
   // Dev bypass: admin auth is off → no point in showing a login form.
   if (ADMIN_AUTH_DISABLED) {
@@ -70,6 +70,11 @@ export default async function AdminLoginPage({ searchParams }: PageProps) {
           <h1 className="font-serif text-2xl font-semibold">Admin login</h1>
           <p className="text-sm text-muted-foreground">Sign in with your admin account</p>
         </div>
+        {timeout && (
+          <p className="rounded-md border border-amber-300 bg-amber-50 p-3 text-center text-sm text-amber-800">
+            You were signed out due to inactivity. Please sign in again.
+          </p>
+        )}
         <LoginForm redirectTo={redirectTo} />
       </div>
     </div>

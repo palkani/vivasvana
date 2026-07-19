@@ -2,6 +2,7 @@ import { jwtVerify } from 'jose';
 import { prisma } from '@vivasvana/db';
 import type { StaffRole, UserRole } from '@vivasvana/db';
 import { env } from './config/env';
+import { supabaseAdmin } from './integrations/supabase-admin';
 import { NotificationService } from './services/notification.service';
 import {
   ALL_PERMISSIONS,
@@ -39,14 +40,29 @@ const notifications = new NotificationService(prisma);
 const jwtSecret = () => new TextEncoder().encode(env.SUPABASE_JWT_SECRET);
 
 async function verifyToken(token: string): Promise<{ sub: string; email: string } | null> {
+  // Fast path: verify locally with the shared HS256 JWT secret (no network).
   try {
     const { payload } = await jwtVerify(token, jwtSecret(), {
       algorithms: ['HS256'],
       audience: 'authenticated',
     });
-    if (!payload.sub || typeof payload.sub !== 'string') return null;
-    const email = typeof payload.email === 'string' ? payload.email : '';
-    return { sub: payload.sub, email };
+    if (payload.sub && typeof payload.sub === 'string') {
+      const email = typeof payload.email === 'string' ? payload.email : '';
+      return { sub: payload.sub, email };
+    }
+  } catch {
+    // Local verify failed — fall through to the Supabase-validated path.
+  }
+
+  // Fallback: let Supabase validate the token. This makes auth robust to a
+  // mismatched/missing SUPABASE_JWT_SECRET AND to projects using the newer
+  // ASYMMETRIC JWT signing keys (ES256/RS256), which the HS256 shared secret
+  // can't verify. Slower (a network round-trip) but correct — otherwise every
+  // authenticated request 401s.
+  try {
+    const { data, error } = await supabaseAdmin().auth.getUser(token);
+    if (error || !data.user) return null;
+    return { sub: data.user.id, email: data.user.email ?? '' };
   } catch {
     return null;
   }

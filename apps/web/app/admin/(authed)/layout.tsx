@@ -3,6 +3,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { AdminSidebar } from './_components/AdminSidebar';
 import { DevAuthBanner } from './_components/DevAuthBanner';
 import { AdminMeProvider } from './_components/AdminMeProvider';
+import { IdleTimeout } from './_components/IdleTimeout';
 
 // Admin pages need a live Supabase session check — prerendering them at
 // build time would call createSupabaseServerClient() before env vars are
@@ -60,6 +61,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <AdminMeProvider>
+      <IdleTimeout />
       <div className="grid min-h-screen grid-cols-1 md:grid-cols-[240px_1fr]">
         <AdminSidebar userEmail={user.email ?? ''} />
         <main className="min-w-0 bg-muted/30 p-4 md:p-8">{children}</main>
