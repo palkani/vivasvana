@@ -18,6 +18,16 @@ const money = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, 'use a decimal string like "299.00"');
 
+// Absolute Supabase Storage URLs OR root-relative /public paths (seed data).
+const imageRef = z
+  .string()
+  .min(1)
+  .max(500)
+  .refine(
+    (v) => v.startsWith('/') || /^https?:\/\//i.test(v),
+    'must be an absolute URL or a root-relative path',
+  );
+
 const ProductInput = z.object({
   slug,
   title: z.string().min(1).max(200),
@@ -43,7 +53,7 @@ const ProductInput = z.object({
   allergens: z.string().optional(),
   // Images: array of public URLs. Order = sortOrder (0 = cover).
   // On UPDATE this replaces the entire image set for the product.
-  images: z.array(z.string().url()).max(12).optional(),
+  images: z.array(imageRef).max(12).optional(),
 });
 
 const AdminListQuery = z.object({

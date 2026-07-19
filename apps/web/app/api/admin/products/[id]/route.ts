@@ -18,6 +18,18 @@ const money = z
   .string()
   .regex(/^\d+(\.\d{1,2})?$/, 'use a decimal string like "299.00"');
 
+// Product images can be Supabase Storage URLs (absolute) OR bundled assets in
+// /public (root-relative, e.g. "/products/nutri-millet/front.png"). Accept
+// both — requiring an absolute URL rejected every seeded product on edit.
+const imageRef = z
+  .string()
+  .min(1)
+  .max(500)
+  .refine(
+    (v) => v.startsWith('/') || /^https?:\/\//i.test(v),
+    'must be an absolute URL or a root-relative path',
+  );
+
 const ProductInput = z.object({
   slug,
   title: z.string().min(1).max(200),
@@ -39,7 +51,7 @@ const ProductInput = z.object({
   ingredients: z.string().optional(),
   howToUse: z.string().optional(),
   allergens: z.string().optional(),
-  images: z.array(z.string().url()).max(12).optional(),
+  images: z.array(imageRef).max(12).optional(),
 });
 
 const IdParam = z.object({ id: z.string().uuid() });
