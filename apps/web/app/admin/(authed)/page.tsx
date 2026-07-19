@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DashboardKpis } from './_components/DashboardKpis';
+import { RecentOrders } from './_components/RecentOrders';
 
 export default function AdminDashboardPage() {
   return (
@@ -19,13 +20,14 @@ export default function AdminDashboardPage() {
       <DashboardKpis />
 
       <Card>
-        <CardHeader>
-          <CardTitle>Recent activity</CardTitle>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Recent orders</CardTitle>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/admin/orders">View all →</Link>
+          </Button>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Recent orders list lands in Phase 3 once /admin/orders is built.
-          </p>
+          <RecentOrders />
         </CardContent>
       </Card>
     </div>
