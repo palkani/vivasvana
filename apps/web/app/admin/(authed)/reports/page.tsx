@@ -1,4 +1,5 @@
 import { ReportsView } from './_components/ReportsView';
+import { ProfitCards } from './_components/ProfitCards';
 
 export const metadata = {
   title: 'Reports',
@@ -15,6 +16,7 @@ export default function ReportsPage() {
           including COD orders pending delivery.
         </p>
       </div>
+      <ProfitCards />
       <ReportsView />
     </div>
   );

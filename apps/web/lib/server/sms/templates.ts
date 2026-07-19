@@ -51,10 +51,14 @@ export function renderOrderShippedSms(args: {
   carrier?: string | null;
   trackingNumber?: string | null;
 }): string {
-  const via = args.carrier ? ` via ${args.carrier}` : '';
-  const tn = args.trackingNumber ? ` (AWB ${args.trackingNumber})` : '';
+  // FIXED shape for DLT strict template matching: carrier and AWB are always
+  // present as {#var#} slots — we substitute neutral defaults rather than
+  // dropping the segments (variable-shape bodies get rejected by the DLT
+  // template matcher, failing the send).
+  const carrier = args.carrier?.trim() || 'courier';
+  const awb = args.trackingNumber?.trim() || 'NA';
   return (
-    `Vivasvana: Order ${args.orderNumber} shipped${via}${tn}. ` +
+    `Vivasvana: Order ${args.orderNumber} shipped via ${carrier} (AWB ${awb}). ` +
     `Track: ${SITE}/orders`
   );
 }

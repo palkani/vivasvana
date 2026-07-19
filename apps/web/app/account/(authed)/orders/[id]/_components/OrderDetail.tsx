@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { accountApi } from '@/lib/account-api';
+import { OrderTimeline } from '@/components/storefront/OrderTimeline';
 import { formatINR } from '@/lib/utils';
 import { stateName } from '@/lib/india-states';
 import type { Order, OrderStatus } from '@/lib/types';
@@ -183,6 +184,8 @@ export function OrderDetail({ orderId }: { orderId: string }) {
             </dl>
           </CardContent>
         </Card>
+
+        <OrderTimeline endpoint={`/api/orders/${orderId}/timeline`} />
 
         <div className="space-y-4">
           {order.shippingAddress && (

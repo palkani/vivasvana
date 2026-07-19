@@ -163,4 +163,66 @@ export class ReportsService {
       totalItemsSold: items,
     };
   }
+
+  /**
+   * Revenue vs cost of goods sold, using products.cost_price. cost_price can
+   * be null (not every product has a cost yet), so we also return
+   * costCoveragePct = the share of revenue for which cost IS known — a low
+   * number means the margin figure is only partial.
+   */
+  async profitSummary(range: ReportRange = '30d') {
+    const start = startDateFor(range);
+    const rows = await this.prisma.$queryRaw<
+      Array<{ revenue: string | null; cogs: string | null; revenue_with_cost: string | null }>
+    >`
+      SELECT
+        SUM(oi.total)::text AS revenue,
+        SUM(oi.quantity * COALESCE(p.cost_price, 0))::text AS cogs,
+        SUM(CASE WHEN p.cost_price IS NOT NULL THEN oi.total ELSE 0 END)::text AS revenue_with_cost
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      LEFT JOIN products p ON p.id = oi.product_id
+      WHERE o.status::text = ANY (${REVENUE_STATUSES as unknown as string[]}::text[])
+        AND (${start}::timestamptz IS NULL OR o.placed_at >= ${start}::timestamptz);
+    `;
+    const r = rows[0];
+    const revenue = Number(r?.revenue ?? 0);
+    const cogs = Number(r?.cogs ?? 0);
+    const revenueWithCost = Number(r?.revenue_with_cost ?? 0);
+    const grossProfit = revenue - cogs;
+    return {
+      revenue: revenue.toFixed(2),
+      cogs: cogs.toFixed(2),
+      grossProfit: grossProfit.toFixed(2),
+      marginPct: (revenue > 0 ? (grossProfit / revenue) * 100 : 0).toFixed(1),
+      costCoveragePct: (revenue > 0 ? (revenueWithCost / revenue) * 100 : 0).toFixed(0),
+    };
+  }
+
+  /** Snapshot of current inventory value (retail + cost) and low-stock count. */
+  async inventoryValue() {
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        retail_value: string | null;
+        cost_value: string | null;
+        low_stock_count: bigint;
+        product_count: bigint;
+      }>
+    >`
+      SELECT
+        SUM(stock * price)::text AS retail_value,
+        SUM(stock * COALESCE(cost_price, 0))::text AS cost_value,
+        COUNT(*) FILTER (WHERE stock <= low_stock_at)::bigint AS low_stock_count,
+        COUNT(*)::bigint AS product_count
+      FROM products
+      WHERE status::text = 'PUBLISHED' AND deleted_at IS NULL;
+    `;
+    const r = rows[0];
+    return {
+      retailValue: r?.retail_value ?? '0',
+      costValue: r?.cost_value ?? '0',
+      lowStockCount: Number(r?.low_stock_count ?? 0),
+      productCount: Number(r?.product_count ?? 0),
+    };
+  }
 }

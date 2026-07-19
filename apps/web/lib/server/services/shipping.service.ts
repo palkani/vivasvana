@@ -6,7 +6,7 @@ import {
   assignAwb,
   type ServiceabilityResponse,
 } from '../integrations/shiprocket';
-import type { NotificationService } from './notification.service';
+import type { NotificationService, OrderStatusUpdate } from './notification.service';
 
 /**
  * Shipping orchestration. Wraps the raw Shiprocket client with our
@@ -318,12 +318,21 @@ export class ShippingService {
     current_status?: string;
     shipment_status?: string;
     order_id?: string;
-  }): Promise<{ matched: boolean; orderId?: string; status?: string }> {
-    const status = mapStatus(payload.current_status, payload.shipment_status);
-    if (!status) {
+  }): Promise<{
+    matched: boolean;
+    orderId?: string;
+    status?: string;
+    // The coarse status whose SMS the ROUTE should send via after() — so the
+    // notification reliably completes after the 200 to Shiprocket (a plain
+    // `void` can be frozen by the serverless runtime before it fires).
+    notify?: 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+  }> {
+    const classified = classifyStatus(payload.current_status, payload.shipment_status);
+    if (!classified) {
       console.warn('[shiprocket] webhook with unrecognized status', payload);
       return { matched: false };
     }
+    const { coarse, label } = classified;
 
     // Look up the order by AWB or by our orderNumber. Shiprocket sends
     // both in the payload but field names vary — try both.
@@ -340,41 +349,52 @@ export class ShippingService {
       return { matched: false };
     }
 
-    // Idempotency: don't bounce backwards through the state machine. If
-    // the webhook arrives out of order (transit → delivered → transit
-    // because of a retry on their side), keep the further-along state.
-    if (statusRank(order.status) >= statusRank(status)) {
-      return { matched: true, orderId: order.id, status: order.status };
-    }
+    const now = new Date();
+    const rawStatus = payload.current_status ?? payload.shipment_status ?? null;
 
-    await this.prisma.order.update({
-      where: { id: order.id },
-      data: {
-        status,
-        ...(status === 'SHIPPED' ? { shippedAt: new Date() } : {}),
-        ...(status === 'DELIVERED' ? { deliveredAt: new Date() } : {}),
-      },
+    // ALWAYS append to the append-only timeline, even for intermediate
+    // statuses (picked up / in transit / out for delivery / failed attempt)
+    // that don't advance the coarse state machine. This is what lets the
+    // customer see the full journey, not just milestones.
+    await this.prisma.orderEvent.create({
+      data: { orderId: order.id, status: label, rawStatus, source: 'SHIPROCKET' },
     });
 
-    // Mirror to OrderShipping timestamps where Prisma's relation doesn't
-    // share columns.
-    if (status === 'SHIPPED' || status === 'DELIVERED') {
-      await this.prisma.orderShipping.update({
-        where: { orderId: order.id },
-        data:
-          status === 'SHIPPED'
-            ? { shippedAt: new Date() }
-            : { deliveredAt: new Date() },
+    // Advance the coarse state machine ONLY forward (webhooks can arrive out
+    // of order on retry). Intermediate statuses have coarse === null.
+    let notify: 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | undefined;
+    if (coarse && statusRank(coarse) > statusRank(order.status)) {
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: {
+          status: coarse,
+          ...(coarse === 'SHIPPED' ? { shippedAt: now } : {}),
+          ...(coarse === 'DELIVERED' ? { deliveredAt: now } : {}),
+          ...(coarse === 'CANCELLED' ? { cancelledAt: now } : {}),
+        },
       });
+      if (coarse === 'SHIPPED' || coarse === 'DELIVERED') {
+        await this.prisma.orderShipping
+          .update({
+            where: { orderId: order.id },
+            data: coarse === 'SHIPPED' ? { shippedAt: now } : { deliveredAt: now },
+          })
+          .catch(() => {});
+      }
+      if (coarse === 'SHIPPED' || coarse === 'DELIVERED' || coarse === 'CANCELLED') {
+        notify = coarse;
+      }
     }
 
-    // Fan out the SMS. The notifications service tolerates missing phone
-    // / Twilio creds gracefully.
-    if (status === 'SHIPPED' || status === 'DELIVERED' || status === 'CANCELLED') {
-      void this.notifications.sendOrderStatusUpdate(order.id, status);
-    }
+    return { matched: true, orderId: order.id, status: coarse ?? order.status, notify };
+  }
 
-    return { matched: true, orderId: order.id, status };
+  /** Ordered tracking timeline (oldest first) for an order. */
+  async getTimeline(orderId: string) {
+    return this.prisma.orderEvent.findMany({
+      where: { orderId },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 }
 
@@ -383,29 +403,34 @@ export class ShippingService {
 type AppStatus = 'CONFIRMED' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED' | 'RETURNED';
 
 /**
- * Shiprocket uses ~30 distinct status strings. We collapse them into the
- * 5 our domain cares about. Anything we don't recognize gets logged and
- * we skip the update — better silent than to bounce an order to a wrong
- * state.
+ * Shiprocket uses ~30 distinct status strings. We keep a granular human
+ * `label` for the timeline AND collapse to a `coarse` app OrderStatus for the
+ * state machine. `coarse: null` means "log it on the timeline but don't move
+ * the order's coarse status" (pickup scheduled, in transit, out for delivery,
+ * failed delivery attempt) — those are journey events, not milestones.
  */
-function mapStatus(
+function classifyStatus(
   current?: string,
   shipment?: string,
-): AppStatus | null {
+): { coarse: AppStatus | null; label: string } | null {
   const raw = (current ?? shipment ?? '').toUpperCase();
   if (!raw) return null;
-  if (raw.includes('DELIVERED')) return 'DELIVERED';
-  if (raw.includes('RTO') || raw.includes('RETURN')) return 'RETURNED';
-  if (raw.includes('CANCEL') || raw.includes('LOST')) return 'CANCELLED';
-  if (
-    raw.includes('IN TRANSIT') ||
-    raw.includes('PICKED UP') ||
-    raw.includes('OUT FOR DELIVERY') ||
-    raw.includes('SHIPPED')
-  ) {
-    return 'SHIPPED';
-  }
-  if (raw.includes('CONFIRMED') || raw.includes('PICKUP SCHEDULED')) return 'CONFIRMED';
+  if (raw.includes('DELIVERED')) return { coarse: 'DELIVERED', label: 'Delivered' };
+  if (raw.includes('OUT FOR DELIVERY')) return { coarse: 'SHIPPED', label: 'Out for delivery' };
+  if (raw.includes('UNDELIVER') || raw.includes('NDR') || raw.includes('FAILED'))
+    return { coarse: null, label: 'Delivery attempt failed' };
+  if (raw.includes('RTO') || raw.includes('RETURN'))
+    return { coarse: 'RETURNED', label: 'Returned to origin' };
+  if (raw.includes('LOST')) return { coarse: 'CANCELLED', label: 'Lost in transit' };
+  if (raw.includes('CANCEL')) return { coarse: 'CANCELLED', label: 'Cancelled' };
+  if (raw.includes('IN TRANSIT') || raw.includes('IN-TRANSIT'))
+    return { coarse: 'SHIPPED', label: 'In transit' };
+  if (raw.includes('PICKED UP') || raw.includes('PICKED') || raw.includes('PICKUP GENERATED'))
+    return { coarse: 'SHIPPED', label: 'Picked up' };
+  if (raw.includes('SHIPPED')) return { coarse: 'SHIPPED', label: 'Shipped' };
+  if (raw.includes('PICKUP SCHEDULED') || raw.includes('PICKUP QUEUED'))
+    return { coarse: null, label: 'Pickup scheduled' };
+  if (raw.includes('CONFIRMED')) return { coarse: 'CONFIRMED', label: 'Confirmed' };
   return null;
 }
 

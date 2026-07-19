@@ -12,6 +12,7 @@ import { stateName } from '@/lib/india-states';
 import type { Order, OrderStatus, Payment } from '@/lib/types';
 import { ShipmentForm } from './ShipmentForm';
 import { OrderTimeline } from './OrderTimeline';
+import { OrderTimeline as CarrierTimeline } from '@/components/storefront/OrderTimeline';
 
 interface AdminOrder extends Order {
   payments: Payment[];
@@ -276,6 +277,8 @@ export function AdminOrderDetail({ orderId }: { orderId: string }) {
       </Card>
 
       <OrderTimeline order={order} />
+
+      <CarrierTimeline endpoint={`/api/admin/orders/${orderId}/timeline`} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* ---- Items + totals ------------------------------------------ */}

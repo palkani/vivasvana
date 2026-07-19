@@ -346,6 +346,7 @@ model Order {
   items           OrderItem[]
   shippingAddress OrderShipping?
   payments        Payment[]
+  events          OrderEvent[]
 
   @@index([userId])
   @@index([status])
@@ -431,6 +432,27 @@ model OrderShipping {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_shipping")
+}
+
+// order_events is an append-only tracking timeline: every shipping-carrier
+// webhook and admin status action is logged here with the raw carrier status
+// + a human label, so the customer sees a full journey (not just milestones)
+// and we keep an audit trail. `status` is a granular display label (e.g.
+// "Out for delivery"); orders.status stays the coarse state machine.
+model OrderEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  orderId   String   @map("order_id") @db.Uuid
+  status    String // display label, e.g. "Shipped", "Out for delivery", "Delivered"
+  rawStatus String?  @map("raw_status") // carrier's raw status string
+  location  String? // city/hub, when the carrier provides it
+  note      String?  @db.Text
+  source    String   @default("SYSTEM") // SHIPROCKET | ADMIN | SYSTEM
+  createdAt DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@map("order_events")
 }
 
 // =============================================================================

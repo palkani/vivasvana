@@ -11,6 +11,7 @@ import { ProductGallery } from './_components/ProductGallery';
 import { AddToCartForm } from './_components/AddToCartForm';
 import { PincodeCheck } from '@/components/storefront/PincodeCheck';
 import { ProductTabs } from './_components/ProductTabs';
+import { ProductReviews } from './_components/ProductReviews';
 import { env } from '@/lib/env';
 
 interface PageProps {
@@ -159,6 +160,8 @@ export default async function ProductPage({ params }: PageProps) {
         </div>
 
         <ProductTabs product={product} />
+
+        <ProductReviews slug={product.slug} />
       </div>
     </>
   );
