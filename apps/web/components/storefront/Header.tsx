@@ -4,7 +4,7 @@ import { HeaderActions } from './HeaderActions';
 
 const nav = [
   { href: '/', label: 'Home' },
-  { href: '/products', label: 'Products' },
+  { href: '/products', label: 'Catalog' },
   { href: '/contact', label: 'Contact' },
   { href: '/blog', label: 'Wellness Blog' },
 ];
