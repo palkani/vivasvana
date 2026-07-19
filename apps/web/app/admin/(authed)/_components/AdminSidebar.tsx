@@ -78,7 +78,7 @@ export function AdminSidebar({ userEmail, devMode = false }: Props) {
       <div className="mb-4">
         <Link href="/admin" className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo.png" alt="Vivasvana" className="h-8 w-auto" />
+          <img src="/brand/logo-2026.png" alt="Vivasvana" className="h-8 w-auto" />
           <span className="font-serif text-lg font-semibold">Admin</span>
         </Link>
       </div>

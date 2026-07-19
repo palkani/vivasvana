@@ -24,7 +24,7 @@ export function Header() {
           className="flex items-center leading-none"
         >
           <Image
-            src="/brand/logo.png"
+            src="/brand/logo-2026.png"
             alt="Vivasvana — Mindful nourishment made pure"
             width={1363}
             height={855}

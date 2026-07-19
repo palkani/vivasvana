@@ -8,7 +8,7 @@ export function Footer() {
         <div className="grid gap-8 md:grid-cols-4">
           <div>
             <Image
-              src="/brand/logo.png"
+              src="/brand/logo-2026.png"
               alt="Vivasvana — Mindful nourishment made pure"
               width={1363}
               height={855}
