@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { SunMark } from './SunMark';
+import Image from 'next/image';
 import { HeaderActions } from './HeaderActions';
 
 const nav = [
@@ -21,17 +21,16 @@ export function Header() {
         <Link
           href="/"
           aria-label="Vivasvana — Mindful nourishment made pure"
-          className="flex items-center gap-3 leading-none"
+          className="flex items-center leading-none"
         >
-          <SunMark className="h-12 w-12 shrink-0 md:h-14 md:w-14" />
-          <span className="flex flex-col">
-            <span className="font-serif text-2xl font-semibold tracking-tight text-brand-700 md:text-3xl">
-              Vivasvana
-            </span>
-            <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground md:text-xs">
-              Mindful nourishment made pure
-            </span>
-          </span>
+          <Image
+            src="/brand/logo.png"
+            alt="Vivasvana — Mindful nourishment made pure"
+            width={1363}
+            height={855}
+            priority
+            className="h-14 w-auto md:h-16"
+          />
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex" aria-label="Primary">

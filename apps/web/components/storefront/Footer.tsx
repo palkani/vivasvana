@@ -10,8 +10,8 @@ export function Footer() {
             <Image
               src="/brand/logo.png"
               alt="Vivasvana — Mindful nourishment made pure"
-              width={60}
-              height={60}
+              width={1363}
+              height={855}
               className="h-14 w-auto"
             />
             <p className="mt-3 text-sm text-muted-foreground">
